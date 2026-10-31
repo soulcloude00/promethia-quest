@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Promethia Quest · Scout</title><meta name="robots" content="noindex"><link rel="icon" href="assets/favicon-32.png">
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#f6f3ef;color:#1a2a4f}
+header{background:#1a2a4f;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:10px}header img{width:34px;border-radius:8px}header b{color:#f26b21}
+main{padding:16px}button{background:#f26b21;color:#fff;border:0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer;margin:2px}button.sec{background:#1a2a4f}button.warn{background:#b3202f}
+table{border-collapse:collapse;width:100%;background:#fff;font-size:13px;margin-top:12px}th,td{border:1px solid #ddd;padding:6px;text-align:left;vertical-align:top}th{background:#1a2a4f;color:#fff;position:sticky;top:0;cursor:pointer}
+tr.test td{color:#999}#gate{max-width:320px;margin:80px auto;text-align:center}#gate input{font-size:22px;padding:10px;width:100%;text-align:center;border-radius:8px;border:2px solid #1a2a4f33}
+.k{display:inline-block;background:#fff;border-radius:8px;padding:8px 12px;margin:4px;border:1px solid #ddd}.k b{font-size:20px;display:block}
+details{background:#fff;padding:10px;border-radius:8px;margin-top:12px}
+</style></head><body>
+<header><img src="assets/logo-mark-96.png" alt=""><div><b>Promethia</b> Quest · Scout (this PC only)</div></header>
+<div id="gate"><h2>Enter PIN</h2><input id="pin" type="password" inputmode="numeric" autocomplete="off"><br><br><button id="go">Open</button><p id="err" style="color:#b3202f"></p></div>
+<main id="app" hidden>
+  <div id="kpis"></div>
+  <button id="csv">⬇ Export CSV</button><button class="sec" id="retry">✉ Re-send unsent emails</button><label><input type="checkbox" id="showTest"> show TEST rows</label>
+  <button class="warn" id="wipe" style="float:right">Delete all on this PC</button>
+  <table id="t"></table>
+  <details><summary><b>How scoring works</b></summary><p>Total /100 = Problem-solving 35 (6 puzzle levels; full marks for solving, −10% per failed try, −12% per hint, min 40% if solved) + Persistence 20 (levels finished + coming back after a fail) + Curiosity 15 (secret stars, cracked walls, hidden bushes) + Creativity 20 (free build: blocks, materials, height, spread, naming) + Communication 10 (typed hello line, build reason, boss reflection). Time is recorded but not scored.</p></details>
+</main>
+<script src="config.js"></script>
+<script>
+const K='pq_archive';const $=s=>document.querySelector(s);
+async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+$('#go').onclick=async()=>{if(await sha($('#pin').value)===PQ_CONFIG.SCOUT_PIN_SHA256){$('#gate').hidden=true;$('#app').hidden=false;render()}else $('#err').textContent='Wrong PIN'};
+$('#pin').onkeydown=e=>{if(e.key==='Enter')$('#go').click()};
+const get=()=>{try{return JSON.parse(localStorage.getItem(K)||'[]')}catch(e){return[]}};
+let sortKey='total',dir=-1;
+const COLS=[['finishedAt','Finished'],['name','Name'],['grade','Gr'],['section','Sec'],['pc','PC'],['total','Total'],['problem','Problem /35'],['persistence','Persist /20'],['curiosity','Curious /15'],['creativity','Create /20'],['communication','Comm /10'],['mins','Mins'],['firstTry','1st-try'],['stars','Stars'],['title','Title'],['speech','Hello line'],['why','Build why'],['sent','Emailed']];
+function row(r){return{finishedAt:new Date(r.finishedAt).toLocaleString(),name:r.name,grade:r.grade,section:r.section,pc:r.pc,total:r.scores.total,problem:r.scores.problem,persistence:r.scores.persistence,curiosity:r.scores.curiosity,creativity:r.scores.creativity,communication:r.scores.communication,mins:(r.totalSec/60).toFixed(1),firstTry:r.firstTry+'/'+r.puzzles,stars:r.stars,title:r.title,speech:r.speech?r.speech.line:'',why:r.build?r.build.why:'',sent:r.sent?'✓':'✗',test:r.test,
+ levels:(r.levels||[]).map((l,i)=>l?`L${i+1} ${l.time}s/${l.attempts}t/${l.hints}h${l.skipped?'/skip':''}`:'').join(' | ')}}
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function render(){const all=get();const rows=all.filter(r=>$('#showTest').checked||!r.test).map(row);
+ rows.sort((a,b)=>(a[sortKey]>b[sortKey]?1:a[sortKey]<b[sortKey]?-1:0)*dir);
+ const real=all.filter(r=>!r.test);$('#kpis').innerHTML=`<span class="k"><b>${real.length}</b>attempts</span><span class="k"><b>${real.length?Math.round(real.reduce((a,r)=>a+r.scores.total,0)/real.length):0}</b>avg score</span><span class="k"><b>${real.filter(r=>!r.sent).length}</b>not emailed yet</span>`;
+ $('#t').innerHTML='<tr>'+COLS.map(([k,l])=>`<th data-k="${k}">${l}</th>`).join('')+'<th>Levels (time/tries/hints)</th></tr>'+rows.map(r=>`<tr class="${r.test?'test':''}">${COLS.map(([k])=>`<td>${esc(r[k])}</td>`).join('')}<td>${esc(r.levels)}</td></tr>`).join('');
+ document.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{if(sortKey===th.dataset.k)dir*=-1;else{sortKey=th.dataset.k;dir=-1}render()});}
+$('#showTest').onchange=render;
+$('#csv').onclick=()=>{const all=get();const head=['id','test','finishedAt','name','grade','section','pc','hero','total','problem','persistence','curiosity','creativity','communication','totalSec','firstTry','stars','embers','title','badges',...[1,2,3,4,5,6,7,8].flatMap(i=>[`L${i}_time`,`L${i}_attempts`,`L${i}_fails`,`L${i}_hints`,`L${i}_explore`,`L${i}_completed`,`L${i}_skipped`]),'build_blocks','build_materials','build_height','build_type','build_name','build_why','speech_line','speech_wrong_picks','boss_how','boss_line','emailed'];
+ const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ const lines=all.map(r=>[r.id,r.test?'TEST':'',r.finishedAt,r.name,r.grade,r.section,r.pc,r.hero,r.scores.total,r.scores.problem,r.scores.persistence,r.scores.curiosity,r.scores.creativity,r.scores.communication,r.totalSec,r.firstTry+'/'+r.puzzles,r.stars,r.embers,r.title,(r.badges||[]).join('; '),...[0,1,2,3,4,5,6,7].flatMap(i=>{const l=(r.levels||[])[i];return l?[l.time,l.attempts,l.fails,l.hints,l.explore,l.completed,l.skipped]:['','','','','','','']}),r.build?.blocks,r.build?.materials,r.build?.height,r.build?.type,r.build?.name,r.build?.why,r.speech?.line,r.speech?.wrongPicks,r.boss?.how,r.boss?.line,r.sent?'yes':'no'].map(q).join(','));
+ const blob=new Blob(['\ufeff'+[head.join(','),...lines].join('\r\n')],{type:'text/csv'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='promethia-quest-'+new Date().toISOString().slice(0,10)+'.csv';a.click()};
+$('#retry').onclick=async()=>{const all=get();let n=0;for(const r of all){if(r.sent||r.test)continue;try{await send(r);r.sent=true;n++}catch(e){break}}localStorage.setItem(K,JSON.stringify(all));alert(n+' sent');render()};
+async function send(r){const res=await fetch(PQ_CONFIG.SUBMIT_URL,{method:'POST',headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({_subject:`Promethia Quest (resend): ${r.name} (G${r.grade}${r.section}) ${r.scores.total}/100`,_template:'table',_captcha:'false',attempt_id:r.id,student:r.name,grade:r.grade,section:r.section,lab_pc:r.pc,total_score:r.scores.total,scores:JSON.stringify(r.scores),levels:JSON.stringify(r.levels),build:JSON.stringify(r.build),speech:JSON.stringify(r.speech),boss:JSON.stringify(r.boss)})});if(!res.ok)throw new Error(res.status)}
+$('#wipe').onclick=()=>{if(confirm('Export CSV first! Delete ALL attempts saved on this PC?')&&confirm('Really delete? This cannot be undone.')){localStorage.removeItem(K);render()}};
+</script></body></html>
