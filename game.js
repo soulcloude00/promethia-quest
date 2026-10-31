@@ -94,7 +94,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const scene = new THREE.Scene();
 const SKY = new THREE.Color('#8fd3ff');
-scene.background = SKY; scene.fog = new THREE.Fog(SKY, 30, 70);
+scene.background = SKY; const FOG = new THREE.Fog('#cfeeff', 30, 75); scene.fog = FOG; const FOG2 = new THREE.Fog('#cfeeff', 45, 140);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
 const hemi = new THREE.HemisphereLight('#dff3ff', '#6b5a3a', 1.1); scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff1d6', 2.2); sun.position.set(-8, 16, 10);
@@ -136,6 +136,24 @@ const TEX = {
   pad: pixTex((g, s) => { g.fillStyle = '#2b3d6b'; g.fillRect(0, 0, s, s); g.fillStyle = '#f26b21'; g.fillRect(1, 1, s - 2, 1); g.fillRect(1, s - 2, s - 2, 1); g.fillRect(1, 1, 1, s - 2); g.fillRect(s - 2, 1, 1, s - 2); g.fillStyle = '#ffb27f'; g.fillRect(7, 7, 2, 2); }),
   dark: pixTex(speckle('#3a3550', ['#2c2840', '#48425f', '#25223a'])),
 };
+TEX.water = pixTex((g, s) => { g.fillStyle = '#2f8fe0'; g.fillRect(0, 0, s, s); for (let i = 0; i < 26; i++) { g.fillStyle = pick(['#4aa6f0', '#7cc4ff', '#2378c8']); g.fillRect(Math.random() * s | 0, Math.random() * s | 0, 3, 1); } });
+TEX.water.wrapS = TEX.water.wrapT = THREE.RepeatWrapping;
+const skyCache = {};
+function skyGrad(cols) { const k = cols.join(); if (skyCache[k]) return skyCache[k]; const c = document.createElement('canvas'); c.width = 4; c.height = 256; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 256); cols.forEach((col, i) => gr.addColorStop(i / (cols.length - 1), col)); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return skyCache[k] = t; }
+const DAY = ['#2f7fd8', '#7cc8ff', '#d9f2ff'];
+const cardCache = {};
+function cardCanvas(em, label, bg = '#fff6ec') {
+  const k = em + '|' + label + '|' + bg; if (cardCache[k]) return cardCache[k];
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  g.fillStyle = bg; g.beginPath(); g.roundRect ? g.roundRect(8, 8, 240, 240, 34) : g.rect(8, 8, 240, 240); g.fill(); g.lineWidth = 10; g.strokeStyle = '#1a2a4f'; g.stroke();
+  if (em === 'cocoon') { g.fillStyle = '#8a6a3a'; g.beginPath(); g.ellipse(128, 100, 34, 62, 0.2, 0, 7); g.fill(); g.strokeStyle = '#5a4020'; g.lineWidth = 5; for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(98, 100 + i * 20); g.quadraticCurveTo(128, 110 + i * 20, 160, 96 + i * 20); g.stroke(); } g.fillStyle = '#3f8f35'; g.fillRect(100, 26, 70, 10); }
+  else if (em === 'seed') { g.fillStyle = '#6e4a2a'; g.beginPath(); g.ellipse(128, 110, 34, 46, 0.5, 0, 7); g.fill(); g.fillStyle = '#9a6a42'; g.beginPath(); g.ellipse(118, 98, 10, 18, 0.5, 0, 7); g.fill(); g.fillStyle = '#7a5a36'; g.fillRect(40, 168, 176, 14); }
+  else { g.font = '128px "Segoe UI Emoji","Apple Color Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1a2a4f'; g.fillText(em, 128, label ? 104 : 132); }
+  if (label) { g.font = `900 ${label.length > 9 ? 30 : 40}px "Trebuchet MS",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1a2a4f'; g.fillText(label.toUpperCase(), 128, 212); }
+  return cardCache[k] = c;
+}
+function cardSprite(em, label, scale = 1.1, bg) { const t = new THREE.CanvasTexture(cardCanvas(em, label, bg)); t.colorSpace = THREE.SRGBColorSpace; const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, depthWrite: false })); s.scale.set(scale, scale, 1); return s; }
+function cardImg(em, label, bg) { return `<img class="cimg" src="${cardCanvas(em, label, bg).toDataURL()}" alt="${label || ''}">`; }
 const TEXdraw = { brick: (g, s) => { g.fillStyle = '#7c8594'; g.fillRect(0, 0, s, s); g.fillStyle = '#5c6474'; for (let y = 0; y < s; y += 4) { g.fillRect(0, y, s, 1); const o = (y / 4) % 2 ? 4 : 0; for (let x = o; x < s; x += 8) g.fillRect(x, y, 1, 4); } } };
 TEX.cracked = pixTex((g, s) => { TEXdraw.brick(g, s); g.fillStyle = '#20242c'; let x = 3, y = 0; for (let i = 0; i < 16; i++) { g.fillRect(x, y, 1, 1); x = Math.max(1, Math.min(14, x + pick([0, 1, -1]))); y++; } x = 12; y = 2; for (let i = 0; i < 9; i++) { g.fillRect(x, y, 1, 1); x -= pick([0, 1]); y++; } g.fillStyle = '#ffd36b'; g.fillRect(7, 6, 2, 2); g.fillRect(9, 9, 1, 1); });
 
@@ -150,6 +168,7 @@ M.gold = std({ color: '#ffd23f', emissive: '#ff9d00', emissiveIntensity: 0.6 });
 M.cloud = new THREE.MeshLambertMaterial({ color: '#ffffff', transparent: true, opacity: 0.92 });
 M.red = new THREE.MeshBasicMaterial({ color: '#ff2d2d', transparent: true, opacity: 0.55, depthWrite: false });
 M.bars = std({ color: '#5a4a3a' });
+M.water = new THREE.MeshLambertMaterial({ map: TEX.water, color: '#9fd4ff', transparent: true, opacity: 0.85, emissive: '#1a5a9a', emissiveIntensity: 0.25 });
 const BOX = new THREE.BoxGeometry(1, 1, 1);
 
 function emojiTex(ch, size = 128, bg) {
@@ -186,10 +205,12 @@ function batchBlocks(list) { // list of {m, x, y, z, s}
 function mesh(m, x, y, z, sx = 1, sy = 1, sz = 1, parent = world) {
   const o = new THREE.Mesh(BOX, typeof m === 'string' ? M[m] : m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.castShadow = o.receiveShadow = true; parent.add(o); return o;
 }
-function tree(x, z, list, h = 3) {
-  for (let y = 0; y < h; y++) list.push({ m: 'log', x, y: y + 0.5, z });
-  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (let dy = 0; dy < 2; dy++) if (!(dy === 1 && Math.abs(dx) + Math.abs(dz) === 2)) list.push({ m: 'leaves', x: x + dx, y: h + dy + 0.5, z: z + dz });
-  list.push({ m: 'leaves', x, y: h + 2.5, z });
+function instBlocks(arr, m, parent) { const im = new THREE.InstancedMesh(BOX, M[m], arr.length); const d = new THREE.Object3D(); arr.forEach((p, i) => { d.position.set(p[0], p[1], p[2]); d.updateMatrix(); im.setMatrixAt(i, d.matrix); }); im.castShadow = im.receiveShadow = true; parent.add(im); return im; }
+function addTree(x, z, h = 3, parent = world, y0 = 0) {
+  const g = new THREE.Group(); g.position.set(x, y0, z); const logs = [], lv = [];
+  for (let y = 0; y < h; y++) logs.push([0, y + 0.5, 0]);
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) for (let dy = 0; dy < 2; dy++) if (!(dy === 1 && Math.abs(dx) + Math.abs(dz) === 2)) lv.push([dx, h + dy + 0.5, dz]);
+  lv.push([0, h + 2.5, 0]); instBlocks(logs, 'log', g); instBlocks(lv, 'leaves', g); g.userData.sway = Math.random() * 6; parent.add(g); return g;
 }
 let torchFire = null, torchLight = null;
 function buildDecor() {
@@ -235,19 +256,19 @@ function buildLevel(def) {
     }
   }
   // grassy rim + trees around the island
-  const occ = new Set(); for (let z = 0; z < GH; z++) for (let x = 0; x < GW; x++) occ.add(x + ',' + z);
+  const trees = []; const occ = new Set(); for (let z = 0; z < GH; z++) for (let x = 0; x < GW; x++) occ.add(x + ',' + z);
   for (let z = -3; z < GH + 2; z++) for (let x = -3; x < GW + 3; x++) {
     if (occ.has(x + ',' + z)) continue; const d = Math.max(-x, x - GW + 1, -z, z - GH + 1); if (d > 3 || (d === 3 && Math.random() < 0.6)) continue;
     if (z >= GH && d > 1) continue; // keep the front clear for the camera
     list.push({ m: 'grass', x: wx(x), y: -0.5, z: wz(z) }); list.push({ m: 'dirt', x: wx(x), y: -1.5, z: wz(z) });
     for (let k = 2; k < 5 - d; k++) list.push({ m: 'dirt', x: wx(x), y: -k - 0.5, z: wz(z) });
-    if (z < GH - 1 && (x < -1 || x > GW) && Math.random() < 0.3) tree(wx(x), wz(z), list, 2 + (Math.random() * 2 | 0));
+    if (z < GH - 1 && (x < -1 || x > GW) && Math.random() < 0.3) trees.push([wx(x), wz(z), 2 + (Math.random() * 2 | 0)]);
   }
-  batchBlocks(list);
+  batchBlocks(list); trees.forEach(([x, z, h]) => addTree(x, z, h));
   // shadow camera bounds
   const ext = Math.max(GW, GH) / 2 + 4; Object.assign(sun.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext, near: 1, far: 50 }); sun.shadow.camera.updateProjectionMatrix();
   sun.target.position.set(0, 0, 0);
-  scene.background = new THREE.Color(def.sky || '#8fd3ff'); scene.fog.color = scene.background;
+  scene.background = def.sky ? skyGrad(['#15122e', def.sky, '#6a5a8a']) : skyGrad(DAY); FOG.color.set(def.sky || '#cfeeff'); scene.fog = FOG;
 }
 
 /* special tile objects */
@@ -284,7 +305,7 @@ const HEROES = [
   { id: 'jade', name: 'Jade', shirt: '#2fa86b', pants: '#5a3a20', hair: '#111111', skin: '#f1c9a5' },
   { id: 'ruby', name: 'Ruby', shirt: '#d63b5a', pants: '#3a2a5a', hair: '#7a3a10', skin: '#8d5a3b' },
 ];
-const player = { g: new THREE.Group(), x: 0, z: 0, moving: false, queue: [], face: 0, parts: {}, hero: HEROES[0], walkT: 0 };
+const player = { g: new THREE.Group(), x: 0, z: 0, moving: false, queue: [], face: 0, parts: {}, hero: HEROES[0], walkT: 0, jumpT: 0 };
 function buildPlayer(h) {
   const P = player.g; P.clear(); player.hero = h;
   const m = c => new THREE.MeshLambertMaterial({ color: c });
@@ -322,6 +343,7 @@ function isTrigger(c) { return !!(c && (c.trigger || (L && L.def.trigger && L.de
 const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 function tryStep(dx, dz) {
   if (player.moving || !L || L.locked) return false;
+  if (L.def.onTry) L.def.onTry(dx, dz);
   const nx = player.x + dx, nz = player.z + dz, c = cell(nx, nz);
   player.face = Math.atan2(dx, dz);
   if (c && c.t === 'x') { breakCrack(c); return false; }
@@ -332,7 +354,7 @@ function tryStep(dx, dz) {
   } else if (isSolid(c)) { bump(); if (L.def.onBump) L.def.onBump(c); return false; }
   player.moving = true; const fx = wx(player.x), fz = wz(player.z); player.x = nx; player.z = nz;
   Sound.sfx('step'); L.rec.steps++;
-  tween(0.15, k => { player.g.position.x = fx + (wx(nx) - fx) * k; player.g.position.z = fz + (wz(nz) - fz) * k; player.g.position.y = Math.sin(k * Math.PI) * 0.12; }, () => { player.moving = false; arrive(c); });
+  tween(0.15, k => { player.g.position.x = fx + (wx(nx) - fx) * k; player.g.position.z = fz + (wz(nz) - fz) * k; player.g.position.y = Math.sin(k * Math.PI) * 0.16; }, () => { player.moving = false; if (quality === 'high' && Math.random() < 0.5) burst(player.g.position.clone().setY(0.05), '#d8c7a0', 3, 0.5); arrive(c); });
   return true;
 }
 function bump() { Sound.sfx('bump'); const g = player.g; const ox = g.position.x, oz = g.position.z; const dx = Math.sin(player.face) * 0.15, dz = Math.cos(player.face) * 0.15; tween(0.16, k => { const s = Math.sin(k * Math.PI); g.position.x = ox + dx * s; g.position.z = oz + dz * s; }); player.queue = []; }
@@ -376,6 +398,7 @@ function burst(pos, color, n = 12, speed = 3) {
   for (let i = 0; i < n; i++) { const p = new THREE.Mesh(PGEO, mat); p.position.copy(pos); p.userData = { v: new THREE.Vector3(rnd(-1, 1) * speed, rnd(1, 2.5) * speed, rnd(-1, 1) * speed), life: rnd(0.6, 1.1) }; scene.add(p); parts.push(p); }
 }
 function confetti(n = 60) { const cols = ['#f26b21', '#ffd23f', '#1a2a4f', '#2fa86b', '#ff4f8b', '#4fc3ff']; for (let i = 0; i < n / 6; i++) burst(new THREE.Vector3(player.g.position.x + rnd(-2, 2), 2, player.g.position.z + rnd(-2, 2)), pick(cols), 6, 2.2); }
+function islandY() { let best = 0, bd = 1e9; ISL.forEach(s2 => { const d = s2.pos.distanceTo(player.g.position); if (d < bd) { bd = d; best = s2.pos.y; } }); return best; }
 let shakeAmt = 0; function shake(a) { shakeAmt = Math.max(shakeAmt, a); }
 
 /* camera */
@@ -387,12 +410,136 @@ function fitCamera() {
   camDist = Math.max(dW, dH, 8) * (asp < 0.8 ? 1.0 : 1.05);
   camTarget.set(0, 0, 0.6 + (asp < 0.8 ? 0.6 : 0) + ((L && L.def.camZ) || 0));
 }
+let camCtl = null;
 function updateCamera(dt) {
+  if (camCtl) { camCtl(dt); return; }
   const dir = new THREE.Vector3(0, 0.78, 0.62).normalize();
   const want = camTarget.clone().addScaledVector(dir, camDist);
   camera.position.lerp(want, Math.min(1, dt * 4));
   if (shakeAmt > 0) { camera.position.x += rnd(-1, 1) * shakeAmt; camera.position.y += rnd(-1, 1) * shakeAmt; shakeAmt = Math.max(0, shakeAmt - dt * 1.5); }
   camera.lookAt(camTarget);
+}
+
+
+/* ================= AMBIENT PARTICLES ================= */
+const AMB_N = 160; const ambPos = new Float32Array(AMB_N * 3), ambSpd = new Float32Array(AMB_N);
+for (let i = 0; i < AMB_N; i++) { ambPos[i * 3] = rnd(-11, 11); ambPos[i * 3 + 1] = rnd(0, 7); ambPos[i * 3 + 2] = rnd(-8, 8); ambSpd[i] = rnd(0.15, 0.5); }
+const ambGeo = new THREE.BufferGeometry(); ambGeo.setAttribute('position', new THREE.BufferAttribute(ambPos, 3));
+const ambPts = new THREE.Points(ambGeo, new THREE.PointsMaterial({ color: '#ffe2a8', size: 0.09, transparent: true, opacity: 0.85, depthWrite: false })); scene.add(ambPts);
+function ambTick(dt, t) {
+  const n = quality === 'high' ? AMB_N : 50; ambGeo.setDrawRange(0, n);
+  for (let i = 0; i < n; i++) { ambPos[i * 3 + 1] += ambSpd[i] * dt; ambPos[i * 3] += Math.sin(t / 900 + i) * dt * 0.2; if (ambPos[i * 3 + 1] > 7) ambPos[i * 3 + 1] = 0; }
+  ambGeo.attributes.position.needsUpdate = true;
+}
+
+/* ================= SPACE + EARTH ================= */
+let MODE = 'space';
+const space = new THREE.Group(); scene.add(space);
+const earthTex = (() => {
+  const W = 256, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  g.fillStyle = '#1f5fbf'; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 500; i++) { g.fillStyle = pick(['#2468c9', '#1a55ad', '#2a74d6']); g.fillRect(Math.random() * W | 0, Math.random() * H | 0, 4, 2); }
+  const blobs = [[40, 40, 22], [70, 70, 18], [60, 95, 14], [130, 45, 26], [150, 75, 20], [140, 100, 12], [200, 50, 24], [215, 85, 16], [180, 30, 12], [100, 30, 10]];
+  for (let y = 0; y < H; y += 4) for (let x = 0; x < W; x += 4) {
+    let land = 0; for (const [bx, by, r] of blobs) { const d = Math.hypot(x - bx, (y - by) * 1.3); land = Math.max(land, 1 - d / (r + Math.sin(x * 0.3 + y * 0.2) * 5)); }
+    if (land > 0) { g.fillStyle = land > 0.6 ? pick(['#7a6a4a', '#5a9a3a']) : land > 0.12 ? pick(['#3f9b3a', '#5fb34a', '#4a8a30']) : '#d9c27a'; g.fillRect(x, y, 4, 4); }
+    if (y < 10 || y > H - 12) { g.fillStyle = '#f2f8ff'; g.fillRect(x, y, 4, 4); }
+  }
+  const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const cloudTex = (() => { const c = document.createElement('canvas'); c.width = 256; c.height = 128; const g = c.getContext('2d'); g.fillStyle = '#fff'; for (let i = 0; i < 70; i++) { const x = Math.random() * 256, y = 14 + Math.random() * 100; for (let j = 0; j < 4; j++) g.fillRect(x + j * 4, y + rnd(-3, 3), rnd(6, 14), 4); } const t = new THREE.CanvasTexture(c); t.magFilter = THREE.NearestFilter; return t; })();
+const earth = new THREE.Mesh(new THREE.SphereGeometry(10, 48, 32), new THREE.MeshLambertMaterial({ map: earthTex })); space.add(earth);
+const earthClouds = new THREE.Mesh(new THREE.SphereGeometry(10.25, 40, 28), new THREE.MeshLambertMaterial({ map: cloudTex, transparent: true, opacity: 0.85, depthWrite: false })); space.add(earthClouds);
+{ const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 30, 64, 64, 64); gr.addColorStop(0, '#6fc3ffaa'); gr.addColorStop(0.55, '#3f8fff55'); gr.addColorStop(1, '#3f8fff00'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); glow.scale.set(30, 30, 1); glow.position.z = -2; space.add(glow); }
+{ const n = 1600, p = new Float32Array(n * 3); for (let i = 0; i < n; i++) { const v = new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).normalize().multiplyScalar(rnd(120, 260)); p.set([v.x, v.y, v.z], i * 3); }
+  const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.BufferAttribute(p, 3)); space.add(new THREE.Points(gg, new THREE.PointsMaterial({ color: '#ffffff', size: 1.1, sizeAttenuation: true }))); }
+const SC = { pos: new THREE.Vector3(0, 2, 36), look: new THREE.Vector3(0, 0, 0), spin: 0.12 };
+function spaceCam() { const far = camera.aspect < 0.8 ? 1.6 : 1; camCtl = () => { camera.position.copy(SC.pos).multiplyScalar(SC.zoom ? 1 : far); camera.lookAt(SC.look); }; }
+
+/* ================= ISLAND MAP ================= */
+const overworld = new THREE.Group(); scene.add(overworld); overworld.visible = false;
+const ISL = []; let mapPortrait = null;
+function setMode(m) {
+  MODE = m; space.visible = m === 'space'; overworld.visible = m === 'map'; world.visible = decor.visible = m === 'level';
+  ambPts.visible = m !== 'space'; marker.visible = false;
+  if (m === 'space') { scene.background = new THREE.Color('#02040c'); scene.fog = null; player.g.visible = false; spaceCam(); }
+  else if (m === 'map') { scene.background = skyGrad(DAY); scene.fog = FOG2; }
+  else { camCtl = null; }
+}
+function buildOverworld() {
+  const portrait = camera.aspect < 0.8; if (ISL.length && portrait === mapPortrait) return; mapPortrait = portrait;
+  overworld.clear(); ISL.length = 0; const N = LEVELS.length;
+  for (let i = 0; i < N; i++) {
+    const t = i / (N - 1); const pos = portrait ? new THREE.Vector3(Math.sin(t * Math.PI * 3.2) * 4.5, Math.sin(i * 1.7) * 0.6, 28 - 56 * t) : new THREE.Vector3(-29 + 58 * t, Math.sin(i * 1.7) * 0.6, Math.sin(t * Math.PI * 3) * 6 - 1);
+    const g = new THREE.Group(); g.position.copy(pos); overworld.add(g); const top = [], dirt = [], stone = [];
+    for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const d = Math.hypot(dx, dz); if (d > 1.5) continue; top.push([dx, -0.5, dz]); for (let k = 1; k < 3.6 - d; k++) (k > 2 ? stone : dirt).push([dx * (1 - k * 0.1), -0.5 - k, dz * (1 - k * 0.1)]); }
+    instBlocks(top, 'grass', g); instBlocks(dirt, 'dirt', g); if (stone.length) instBlocks(stone, 'stone', g);
+    if (i % 3 === 1) { const tr = addTree(1, -1, 2, g); tr.scale.setScalar(0.45); }
+    const def = LEVELS[i]; const sign = cardSprite(def.emoji, String(i + 1), 1.4); sign.position.set(0, 2.6, -0.4); g.add(sign);
+    const pole = mesh('log', -1, 0.6, 0.9, 0.18, 1.2, 0.18, g); const flame = new THREE.Group(); [['#ff7a1a', 0.34, 0], ['#ffd23f', 0.2, 0.12]].forEach(([c, sz, y]) => { const f = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: c })); f.scale.set(sz, sz * 1.4, sz); f.position.y = y; flame.add(f); }); flame.position.set(-1, 1.4, 0.9); flame.visible = false; g.add(flame);
+    const lock = sprite('🔒', 0.9); lock.position.set(0, 1.5, 0); g.add(lock);
+    g.userData.bob = i; ISL.push({ pos, g, flame, lock, sign, bridge: null });
+  }
+  for (let i = 0; i < N - 1; i++) {
+    const a = ISL[i].pos, b = ISL[i + 1].pos, dir = b.clone().sub(a); const len = dir.length(); const n = Math.max(1, Math.round(len - 3)); const planks = [];
+    const ang = Math.atan2(dir.x, dir.z);
+    for (let k = 0; k < n; k++) { const f = (1.5 + (k + 0.5) * (len - 3) / n) / len; const p = a.clone().lerp(b, f); p.y -= 0.06 + Math.sin(f * Math.PI) * 0.35;
+      const pl = new THREE.Mesh(BOX, M.plank); pl.position.copy(p); pl.scale.set(1.0, 0.12, (len - 3) / n * 0.85); pl.rotation.y = ang; pl.castShadow = true; pl.visible = false; overworld.add(pl);
+      const gh = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.18, depthWrite: false })); gh.position.copy(pl.position); gh.scale.copy(pl.scale); gh.rotation.y = ang; overworld.add(gh); planks.push({ pl, gh }); }
+    ISL[i].bridge = { planks, built: false };
+  }
+  for (let i = 0; i < 18; i++) { const g = new THREE.Group(); const n = 3 + (Math.random() * 3 | 0); for (let j = 0; j < n; j++) { const c = new THREE.Mesh(BOX, M.cloud); c.scale.set(rnd(2, 4), 1, rnd(1.5, 3)); c.position.set(j * 1.8 - n, 0, rnd(-0.8, 0.8)); g.add(c); } g.position.set(rnd(-40, 40), rnd(-9, -4), rnd(-30, 25)); g.userData.v = rnd(0.2, 0.6); overworld.add(g); }
+}
+function setBridge(i, on) { const b = ISL[i] && ISL[i].bridge; if (!b) return; b.built = on; b.planks.forEach(p => { p.pl.visible = on; p.gh.visible = !on; }); }
+const MC = { target: new THREE.Vector3(), look: new THREE.Vector3(), dist: 30, follow: true };
+function mapCam() {
+  const portrait = camera.aspect < 0.8; MC.dist = portrait ? 30 : 26;
+  camCtl = dt => { if (MC.follow) { const center = new THREE.Vector3(0, 0, portrait ? 0 : -1); MC.target.copy(player.g.position).lerp(center, portrait ? 0.2 : 0.45); if (portrait) MC.target.z += 7; }
+    const want = MC.target.clone().add(new THREE.Vector3(0, 0.82, 0.57).multiplyScalar(MC.dist)); camera.position.lerp(want, Math.min(1, dt * 2.2)); MC.look.lerp(MC.target, Math.min(1, dt * 3)); camera.lookAt(MC.look); };
+}
+function islandSpot(i) { return ISL[i].pos.clone().add(new THREE.Vector3(0.2, 0, 0.4)); }
+let mapGoResolve = null;
+async function showMap(from, to, first) {
+  await fade(true);
+  ['#hud', '#actions', '#dpad', '#promo', '#buildBar', '#panel'].forEach(s2 => show(s2, false));
+  buildOverworld(); setMode('map'); mapCam();
+  ISL.forEach((s2, i) => { s2.flame.visible = i < (from >= 0 ? from : to); s2.lock.visible = i > to || (i === to && from >= 0 && from < to); s2.sign.material.opacity = i <= to ? 1 : 0.55; s2.sign.material.transparent = true; setBridge(i, i < to - 1 || (i < to && !(from >= 0 && from < to))); });
+  const startI = from >= 0 ? from : to; player.g.visible = true; player.queue = []; player.moving = false;
+  player.g.position.copy(islandSpot(startI)); player.face = 0;
+  if (first) { camera.position.set(0, 140, 60); MC.look.set(0, 0, 0); player.g.position.y += 10; } else camera.position.copy(player.g.position.clone().add(new THREE.Vector3(0, 26, 20)));
+  renderMapUI(to, true);
+  await fade(false);
+  if (first) { const y0 = player.g.position.y, y1 = islandSpot(to).y; await sleep(900); await new Promise(r => tween(0.9, k => player.g.position.y = y0 + (y1 - y0) * (k * k), r)); burst(player.g.position.clone().setY(y1 + 0.1), '#ffffff', 14, 1.5); Sound.sfx('place'); }
+  if (from >= 0 && from < to) {
+    const f = ISL[from].flame; f.visible = true; burst(f.getWorldPosition(new THREE.Vector3()), '#ffb02e', 18, 2); Sound.sfx('collect'); await sleep(500);
+    const br = ISL[from].bridge;
+    for (const p of br.planks) { p.gh.visible = false; p.pl.visible = true; p.pl.scale.y = 0.01; const pl = p.pl; tween(0.2, k => pl.scale.y = 0.01 + 0.11 * k); Sound.sfx('place'); burst(pl.position, '#ffd23f', 3, 1); await sleep(140); }
+    br.built = true; await sleep(250);
+    const pts = [islandSpot(from), ...br.planks.map(p => p.pl.position.clone().setY(p.pl.position.y + 0.06)), islandSpot(to)];
+    player.moving = true;
+    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k]; player.face = Math.atan2(b.x - a.x, b.z - a.z); const d = a.distanceTo(b); await new Promise(r => tween(d * 0.16, kk => { player.g.position.lerpVectors(a, b, kk); player.g.position.y += Math.sin(kk * Math.PI) * 0.1; }, r)); }
+    player.moving = false; player.face = 0;
+    const lk = ISL[to].lock; burst(lk.getWorldPosition(new THREE.Vector3()), '#ffd23f', 16, 2); Sound.sfx('good'); tween(0.4, k => { lk.position.y = 1.5 + k * 2; lk.material.opacity = 1 - k; }, () => { lk.visible = false; lk.position.y = 1.5; lk.material.opacity = 1; });
+    player.jumpT = 0.5;
+  }
+  renderMapUI(to, false);
+  await new Promise(r => { mapGoResolve = r; if (window.__pqAutoMap) setTimeout(() => $('#mapGo').click(), 300); });
+}
+function renderMapUI(to, busy) {
+  const d = LEVELS[to]; show('#mapUI');
+  $('#mapTitle').innerHTML = `Island ${to + 1} of ${LEVELS.length}: ${d.emoji} ${d.name}`; $('#mapSub').textContent = d.skillLabel || '';
+  $('#mapDots').innerHTML = LEVELS.map((l, i) => `<i class="${i < to ? 'done' : i === to ? 'now' : ''}">${i < to ? '✓' : i + 1}</i>`).join('');
+  $('#mapGo').disabled = busy; $('#mapGo').textContent = busy ? 'Building the bridge…' : `Play island ${to + 1} ▶`;
+}
+$('#mapGo').onclick = () => { if (!mapGoResolve) return; Sound.sfx('click'); show('#mapUI', false); const r = mapGoResolve; mapGoResolve = null; r(); };
+async function earthZoom() {
+  setMode('space'); SC.zoom = false; const far = camera.aspect < 0.8 ? 1.6 : 1;
+  const p0 = SC.pos.clone().multiplyScalar(far), l0 = SC.look.clone(); SC.zoom = true; SC.pos.copy(p0);
+  show('#zoomTxt'); Sound.sfx('fire');
+  await new Promise(r => tween(3.0, k => { const e = k * k * (3 - 2 * k); SC.pos.lerpVectors(p0, new THREE.Vector3(0, 7.2, 9.2), e); SC.look.lerpVectors(l0, new THREE.Vector3(0, 9.5, 2), e); SC.spin = 0.12 + Math.sin(k * Math.PI) * 0.5; }, r));
+  $('#fade').classList.add('white'); await fade(true); show('#zoomTxt', false); SC.spin = 0.12;
+  $('#fade').classList.remove('white');
 }
 
 /* ================= STATE + UI ================= */
@@ -414,8 +561,9 @@ function show(id, on = true) { $(id).classList.toggle('hidden', !on); }
 function newRec(def) { return { id: def.id, name: def.name, skill: def.skill, t0: now(), time: 0, attempts: 1, fails: 0, hints: 0, stars: 0, explore: 0, embers: 0, steps: 0, completed: false, skipped: false, firstTry: true, extra: {} }; }
 async function startLevel(i) {
   S.idx = i; const def = LEVELS[i];
-  await fade(true);
-  ['#btnHint', '#btnSkip', '#btnReset', '#btnAct', '#buildBar', '#hearts'].forEach(s => show(s, false));
+  await fade(true); show('#mapUI', false);
+  ['#btnHint', '#btnSkip', '#btnReset', '#btnAct', '#buildBar', '#hearts', '#panel'].forEach(s => show(s, false)); $('#btnAct').onclick = null;
+  setMode('level'); player.g.position.y = 0;
   L = { def, rec: newRec(def), locked: true, hintIdx: 0, goalText: def.goal, t: 0 };
   buildLevel(def);
   for (const row of grid) for (const c of row) {
@@ -447,8 +595,8 @@ async function completeLevel() {
   if (L.rec.hints) L.rec.firstTry = false;
   if (L.def.cleanup) L.def.cleanup(L);
   S.levels[S.idx] = L.rec;
-  if (!L.rec.skipped) { Sound.sfx('win'); confetti(70); await showBanner(pick(['Level clear! 🎉', 'Awesome! 🔥', 'You did it! ⭐', 'Brilliant! 🏆']), 1500); }
-  if (S.idx + 1 < LEVELS.length) startLevel(S.idx + 1); else finishGame();
+  if (!L.rec.skipped) { Sound.sfx('win'); confetti(70); player.jumpT = 0.5; await showBanner(pick(['Level clear! 🎉', 'Awesome! 🔥', 'You did it! ⭐', 'Brilliant! 🏆']), 1500); }
+  if (S.idx + 1 < LEVELS.length) { const n = S.idx + 1; if (!(DEBUG && QS.get('nomap'))) await showMap(S.idx, n); startLevel(n); } else finishGame();
 }
 function getHints() { const h = L.def.hints; return (typeof h === 'function' ? h(L) : h) || []; }
 function giveHint() {
@@ -474,6 +622,8 @@ addEventListener('keydown', e => {
   if (KEYMAP[e.code]) { keys.add(KEYMAP[e.code]); player.queue = []; e.preventDefault(); }
   if (e.code === 'KeyR' && L && L.def.reset && !L.locked) L.def.reset(L, true);
   if (DEBUG && e.code === 'KeyN' && L) completeLevel();
+  if (e.code === 'Space' && L && !L.done && L.def.tap && !L.locked) { e.preventDefault(); L.def.tap(L); }
+  if (e.code === 'Enter' && mapGoResolve && !$('#mapGo').disabled) $('#mapGo').click();
 });
 addEventListener('keyup', e => { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); });
 document.querySelectorAll('#dpad button').forEach(b => {
@@ -519,15 +669,21 @@ function loop(t) {
     for (const d of ['up', 'down', 'left', 'right']) if (keys.has(d)) { tryStep(...DIRS[d]); moved = true; break; }
     if (!moved && player.queue.length) { const [nx, nz] = player.queue.shift(); if (!tryStep(nx - player.x, nz - player.z)) player.queue = []; }
   }
-  // player anim
+  // player anim (walk / idle / jump)
   const P = player.parts; if (P.legL) {
-    player.walkT += dt * (player.moving ? 14 : 0); const s = player.moving ? Math.sin(player.walkT) * 0.6 : 0;
-    P.legL.rotation.x = s; P.legR.rotation.x = -s; P.armL.rotation.x = -s; P.armR.rotation.x = s; P.head.position.y = 1.0 + Math.sin(t / 400) * 0.015;
+    player.walkT += dt * (player.moving ? 14 : 0); const s = player.moving ? Math.sin(player.walkT) * 0.6 : 0; const idle = player.moving ? 0 : Math.sin(t / 650) * 0.07;
+    P.legL.rotation.x = s; P.legR.rotation.x = -s; P.armL.rotation.x = -s + idle; P.armR.rotation.x = s - idle; P.armL.rotation.z = player.jumpT > 0 ? -0.9 : -Math.abs(idle) * 0.5; P.armR.rotation.z = player.jumpT > 0 ? 0.9 : Math.abs(idle) * 0.5; P.head.position.y = 1.0 + Math.sin(t / 400) * 0.02; P.head.rotation.y = player.moving ? 0 : Math.sin(t / 1700) * 0.25;
+    if (player.jumpT > 0) { player.jumpT -= dt; const k = 1 - Math.max(0, player.jumpT) / 0.5; player.g.position.y = (MODE === 'map' ? player.g.position.y * 0 + islandY() : 0) + Math.sin(k * Math.PI) * 0.7; }
     const cur = player.g.rotation.y; let d = player.face - cur; d = Math.atan2(Math.sin(d), Math.cos(d)); player.g.rotation.y = cur + d * Math.min(1, dt * 14);
   }
   // promo buddy follows
   if (player.g.visible) { const tp = player.g.position.clone().add(new THREE.Vector3(-0.6, 1.5 + Math.sin(t / 300) * 0.12, 0.3)); promo3d.position.lerp(tp, Math.min(1, dt * 5)); promo3d.visible = true; } else promo3d.visible = false;
   promo3d.rotation.y = Math.sin(t / 700) * 0.4; promoLight.intensity = quality === 'high' ? 1.2 + Math.sin(t / 90) * 0.2 : 0;
+  ambTick(dt, t); sun.position.x = -8 + Math.sin(t / 14000) * 4;
+  if (space.visible) { earth.rotation.y += dt * SC.spin; earthClouds.rotation.y += dt * SC.spin * 1.3; }
+  if (overworld.visible) { ISL.forEach((s2, i) => { s2.flame.scale.y = 1 + Math.sin(t / 90 + i) * 0.15; }); overworld.children.forEach(o => { if (o.userData.v) { o.position.x += o.userData.v * dt; if (o.position.x > 45) o.position.x = -45; } }); }
+  const sway = g => { if (g.userData.sway !== undefined) g.rotation.z = Math.sin(t / 900 + g.userData.sway) * 0.035; };
+  world.children.forEach(sway); overworld.children.forEach(o => o.children && o.children.forEach(sway));
   // world spinners
   world.children.forEach(o => { if (o.userData.spin) { o.rotation.y += dt * 2; o.position.y = 0.55 + Math.sin(t / 300 + o.position.x) * 0.08; } });
   decor.children.forEach(o => { if (o.userData.v) { o.position.x += o.userData.v * dt; if (o.position.x > 45) o.position.x = -45; } if (o.userData.bob !== undefined) o.position.y += Math.sin(t / 1000 + o.userData.bob) * 0.003; });
@@ -561,6 +717,246 @@ function bob(t) { world.children.forEach(o => { if (o.userData.bang) o.position.
 function backToStart(delay = 700) { L.locked = true; player.queue = []; setTimeout(() => { burst(player.g.position.clone().setY(0.5), '#ffffff', 10); placePlayer(L.start[0], L.start[1]); L.locked = false; }, delay); }
 
 /* ================= LEVELS ================= */
+const NEW = {};
+function makeBot(c, scale = 1) {
+  const g = new THREE.Group(); const m = col => new THREE.MeshLambertMaterial({ color: col });
+  mesh(m('#9aa7bd'), 0, 0.45, 0, 0.7, 0.7, 0.5, g); mesh(m('#1a2a4f'), 0, 0.5, 0.26, 0.5, 0.3, 0.02, g); mesh(new THREE.MeshBasicMaterial({ color: '#4fc3ff' }), -0.12, 0.52, 0.28, 0.1, 0.1, 0.02, g); mesh(new THREE.MeshBasicMaterial({ color: '#4fc3ff' }), 0.12, 0.52, 0.28, 0.1, 0.1, 0.02, g);
+  mesh(m('#555'), 0, 0.95, 0, 0.06, 0.3, 0.06, g); mesh(M.gold, 0, 1.12, 0, 0.14, 0.14, 0.14, g); mesh(m('#7c8aa3'), -0.45, 0.45, 0, 0.16, 0.5, 0.16, g); mesh(m('#7c8aa3'), 0.45, 0.45, 0, 0.16, 0.5, 0.16, g);
+  g.scale.setScalar(scale); g.position.set(wx(c.x), 0, wz(c.z)); world.add(g); return g;
+}
+function panel(html) { $('#panel').innerHTML = html; show('#panel', true); }
+function botHop(b) { if (b) tween(0.8, k => { b.rotation.y = k * Math.PI * 2; b.position.y = Math.sin(k * Math.PI) * 0.5; }); }
+
+/* ---------- N1 Robot Sorter (AI, easy) ---------- */
+NEW.N1 = {
+  id: 'N1', name: 'Robot Sorter', emoji: '🧺', skill: 'ai', skillLabel: 'Basics of AI',
+  map: ['###########', '#....R....#', '#.........#', '#.A.....B.#', '#.........#', '#x...S....#', '#####E#####'],
+  intro: 'Robo is learning! 🤖 Show Robo where the food above its head belongs: walk onto the matching bin.',
+  goal: 'Teach Robo: walk onto the right bin',
+  hints: ['Look closely at the food above Robo. What color is it?', 'Each bin has a color sign. Which one fits the food?', 'Robots learn from the examples YOU give them 🤖'],
+  items: [['🍎', 'R'], ['🍌', 'Y'], ['🍓', 'R'], ['🌽', 'Y'], ['🍒', 'R']], tests: [['🍋', 'Y'], ['🌶️', 'R']],
+  solid: c => c.t === 'R',
+  setup(L) {
+    L.i = 0; L.bins = {};
+    for (const row of grid) for (const c of row) {
+      if (c.t === 'R') L.bot = makeBot(c);
+      if (c.t === 'A' || c.t === 'B') { const col = c.t === 'A' ? '#e53935' : '#fdd835'; c.bin = c.t === 'A' ? 'R' : 'Y'; addPad(c, col);
+        const box = mesh(new THREE.MeshLambertMaterial({ color: col }), wx(c.x), 0.35, wz(c.z) - 0.9, 0.9, 0.7, 0.4); box.castShadow = true;
+        const sg = cardSprite(c.t === 'A' ? '🟥' : '🟨', c.t === 'A' ? 'red bin' : 'yellow bin', 1.0); sg.position.set(wx(c.x), 1.5, wz(c.z) - 0.9); world.add(sg); L.bins[c.bin] = c; }
+    }
+    panel(`<div class="pbig">🤖 Teaching Robo: <b id="n1c">0</b> / ${this.items.length}</div>`);
+    this.showItem(L);
+  },
+  showItem(L) { if (L.item) world.remove(L.item); const it = this.items[L.i]; L.item = cardSprite(it[0], '', 1.0); L.item.position.set(wx(5), 2.4, wz(1)); world.add(L.item); if (L.i) say(`Next food for Robo: ${it[0]}`, 0); },
+  onEnter(c) {
+    if (!c.bin || L.testing || L.i >= this.items.length) return; const it = this.items[L.i];
+    if (c.bin === it[1]) {
+      Sound.sfx('good'); const o = L.item; L.item = null; const a = o.position.clone(), b = new THREE.Vector3(wx(c.x), 0.6, wz(c.z) - 0.9);
+      tween(0.5, k => { o.position.lerpVectors(a, b, k); o.position.y += Math.sin(k * Math.PI); }, () => { world.remove(o); burst(b, '#ffd23f', 10); });
+      L.i++; $('#n1c').textContent = L.i; botHop(L.bot);
+      if (L.i >= this.items.length) this.robotTest(L); else setTimeout(() => this.showItem(L), 600);
+    } else failLevel('Hmm, Robo looks confused 🤖❓ Look at the food again!');
+  },
+  async robotTest(L) {
+    L.testing = true; L.locked = true; await sleep(700); say('Now Robo tries ALL BY ITSELF! 🤖 Watch…');
+    for (const [e, k] of this.tests) {
+      const o = cardSprite(e, '', 1.0); o.position.set(wx(5), 2.4, wz(1)); world.add(o); await sleep(900);
+      const bc = L.bins[k]; const a = o.position.clone(), b = new THREE.Vector3(wx(bc.x), 0.6, wz(bc.z) - 0.9);
+      await new Promise(r => tween(0.7, kk => { o.position.lerpVectors(a, b, kk); o.position.y += Math.sin(kk * Math.PI) * 1.2; }, r)); world.remove(o); burst(b, '#4fc3ff', 14); Sound.sfx('good'); botHop(L.bot); await sleep(500);
+    }
+    panel(`<div class="pbig">🤖 Robo learned from YOUR examples! That is how AI learns.</div>`);
+    openGate(); say('Robo sorted new food by itself! 🎉 It learned from you. Walk to the gate ⬇️'); L.locked = false;
+  },
+  update(L, dt, t) { bob(t); if (L.item) L.item.position.y = 2.4 + Math.sin(t / 300) * 0.12; },
+};
+
+/* ---------- N2 Steady Voice (public speaking) ---------- */
+NEW.N2 = {
+  id: 'N2', name: 'Steady Voice', emoji: '🎙️', skill: 'speaking', skillLabel: 'Public Speaking', noWalk: true,
+  map: ['...........', '..sssssss..', '..sssssss..', '...........', '.c.c.c.c.c.', '...........'], floor: 'grass',
+  intro: 'Good speakers talk at a steady pace 🎙️ Tap 🗣️ Speak (or SPACE) each time the ring glows to say the next word!',
+  goal: 'Tap 🗣️ when the ring glows', 
+  hints: ['Watch the ring. Tap right when it shines brightest ✨', 'Not too fast, not too slow. Steady like a clock ⏰'],
+  lines: [['Hello', 'friends!', 'Today', 'I', 'will', 'share', 'my', 'idea.'], ['Thank', 'you', 'for', 'listening!']],
+  setup(L) {
+    L.start = [5, 2]; L.line = 0; L.w = 0; L.bt = 0; L.period = 1.0; L.good = 0; L.miss = 0; L.missRow = 0; L.lastBeat = -1; L.crowd = [];
+    for (const row of grid) for (const c of row) {
+      if (c.t === 's') mesh('plank', wx(c.x), 0.06, wz(c.z), 1, 0.12, 1);
+      if (c.t === 'c') { const p = blockyPerson(pick(['#e53935', '#43a047', '#3b82f6', '#8e24aa', '#fdd835', '#00acc1']), pick(['#e0b088', '#c98f65', '#8d5a3b', '#f1c9a5']), pick(['#222', '#5a3a20', '#ffd23f'])); p.position.set(wx(c.x), 0, wz(c.z)); p.rotation.y = Math.PI; world.add(p); L.crowd.push(p); }
+    }
+    [1.5, 9.5].forEach(x => mesh(new THREE.MeshLambertMaterial({ color: '#1a2a4f' }), wx(x), 1.2, wz(1), 0.4, 2.4, 0.4));
+    L.ring = new THREE.Mesh(new THREE.RingGeometry(0.55, 0.8, 36), new THREE.MeshBasicMaterial({ color: '#ffd23f', transparent: true, side: THREE.DoubleSide, depthWrite: false })); L.ring.position.set(wx(5), 2.3, wz(2)); world.add(L.ring);
+    $('#btnAct').textContent = '🗣️ Speak'; $('#btnAct').onclick = () => this.tap(L); show('#btnAct', true);
+    this.render(L);
+  },
+  start(L) { L.bt = 0; player.face = 0; },
+  render(L) { const ln = this.lines[L.line]; panel(`<div class="voice">${ln.map((w, i) => `<span class="${i < L.w ? 'said' : i === L.w ? 'nowv' : ''}">${w}</span>`).join(' ')}</div><div class="small2">Line ${L.line + 1} of ${this.lines.length} · 🎯 on-beat: ${L.good}</div>`); },
+  phaseDist(L) { const p = (L.bt % L.period) / L.period; return Math.min(p, 1 - p) * L.period; },
+  onPointer(L) { this.tap(L); return true; },
+  tap(L) {
+    if (L.locked || L.finished) return; Sound.init(); const beat = Math.round(L.bt / L.period); if (beat === L.lastBeat) return;
+    const d = this.phaseDist(L);
+    if (d <= 0.3) {
+      L.lastBeat = beat; L.w++; L.good++; L.missRow = 0; Sound.tone(440 + L.w * 60, 0.15, 'triangle', 0.2); L.crowd.forEach((p, i) => tween(0.3, k => p.position.y = Math.sin(k * Math.PI) * 0.15)); player.jumpT = 0.3;
+      const ln = this.lines[L.line];
+      if (L.w >= ln.length) {
+        L.line++; L.w = 0;
+        if (L.line >= this.lines.length) { this.render2(L); return this.finish(L); }
+        L.period = 0.85; say('Great pace! 👏 One more line.', 2500);
+      }
+      this.render(L);
+    } else {
+      L.miss++; L.missRow++; Sound.sfx('bump'); const p = (L.bt % L.period) / L.period;
+      say(p < 0.5 ? 'A little late! Wait for the next glow ✨' : 'Too early! Wait for the glow ✨', 1800);
+      if (L.missRow >= 2) { L.rec.fails++; L.rec.firstTry = false; L.missRow = 0; }
+    }
+  },
+  render2(L) { panel(`<div class="voice"><span class="said">👏 Clear, steady and confident!</span></div>`); },
+  async finish(L) { L.finished = true; show('#btnAct', false); S.voice = { good: L.good, miss: L.miss, ratio: Math.round(100 * L.good / (L.good + L.miss)) / 100 }; L.rec.extra = { ...S.voice }; Sound.sfx('cheer'); confetti(50); L.crowd.forEach((p, i) => tween(1.4, k => { p.position.y = Math.abs(Math.sin(k * Math.PI * 4 + i)) * 0.4; })); await sleep(1500); completeLevel(); },
+  update(L, dt, t) { L.bt += dt; const glow = Math.max(0, 1 - this.phaseDist(L) / 0.3); L.ring.material.opacity = 0.2 + 0.8 * glow; L.ring.scale.setScalar(0.8 + glow * 0.5); L.ring.material.color.set(glow > 0.3 ? '#ffd23f' : '#ffffff'); L.ring.lookAt(camera.position); },
+};
+
+/* ---------- N3 Tale Trail (storytelling) ---------- */
+NEW.N3 = {
+  id: 'N3', name: 'Tale Trail', emoji: '🗺️', skill: 'story', skillLabel: 'Storytelling',
+  map: ['#########', '#.q.q.q.#', '#.......#', '#.v.v.v.#', '#.......#', '#.h.h.h.#', '#*b.S..x#', '####E####'],
+  rows: { h: [['🐉', 'dragon'], ['🤖', 'robot'], ['🧙', 'wizard']], v: [['🏰', 'castle'], ['🚀', 'space'], ['🏝️', 'island']], q: [['🌧️', 'storm'], ['🔑', 'lost key'], ['🍕', 'lost pizza']] },
+  phr: { dragon: 'a dragon', robot: 'a robot', wizard: 'a wizard', castle: 'in a castle', space: 'in space', island: 'on an island', storm: 'a big storm came', 'lost key': 'the magic key was lost', 'lost pizza': 'the giant pizza vanished' },
+  order: ['h', 'v', 'q'], ask: { h: 'WHO is in your story?', v: 'WHERE do they live?', q: 'What PROBLEM happens?' },
+  intro: 'Make your OWN story! 🗺️ Walk onto one card in each row: WHO ➜ WHERE ➜ PROBLEM. Any card is OK!',
+  goal: 'Pick WHO ➜ WHERE ➜ PROBLEM',
+  hints: ['Start with the row closest to you. Any card works!', 'Imagine the story in your head like a movie 🎬'],
+  setup(L) {
+    L.step = 0; L.pick = {}; L.cards = [];
+    const cnt = { h: 0, v: 0, q: 0 };
+    for (const row of grid) for (const c of row) if ('hvq'.includes(c.t) && c.t !== '.') {
+      c.row = c.t; c.idx = cnt[c.t]++; c.t = '.'; const [e, w] = this.rows[c.row][c.idx]; addPad(c); c.trigger = c.row === 'h';
+      c.card = cardSprite(e, w, 1.05); c.card.position.set(wx(c.x), 1.0, wz(c.z)); world.add(c.card); L.cards.push(c);
+    }
+    this.render(L); this.dim(L);
+  },
+  dim(L) { L.cards.forEach(c => { const active = c.row === this.order[L.step]; c.card.material.opacity = active || L.pick[c.row] === c ? 1 : 0.35; c.trigger = active; }); },
+  render(L) { const p = L.pick; const b = (r, txt) => p[r] ? `<b class="fill">${this.rows[r][p[r].idx][0]} ${txt}</b>` : `<b class="blank ${this.order[L.step] === r ? 'now' : ''}">❓ ${r === 'h' ? 'WHO' : r === 'v' ? 'WHERE' : 'PROBLEM'}</b>`;
+    panel(`<div class="tale">Once upon a time, ${b('h', p.h ? this.phr[this.rows.h[p.h.idx][1]] : '')} lived ${b('v', p.v ? this.phr[this.rows.v[p.v.idx][1]] : '')}. One day, ${b('q', p.q ? this.phr[this.rows.q[p.q.idx][1]] : '')}!</div>`); },
+  onEnter(c) {
+    if (!c.row || !c.trigger || L.step >= 3) return; L.pick[c.row] = c; L.step++; Sound.sfx('good'); c.padObj.material = M.gold; burst(c.card.position, '#ffd23f', 12);
+    tween(0.4, k => c.card.scale.setScalar(1.05 + Math.sin(k * Math.PI) * 0.4));
+    this.render(L); this.dim(L);
+    if (L.step < 3) say(`Nice! Now: ${this.ask[this.order[L.step]]} ⬆️`, 0); else this.ending(L);
+  },
+  async ending(L) {
+    const p = L.pick, st = `Once upon a time, ${this.phr[this.rows.h[p.h.idx][1]]} lived ${this.phr[this.rows.v[p.v.idx][1]]}. One day, ${this.phr[this.rows.q[p.q.idx][1]]}!`;
+    await sleep(500);
+    const end = await modal(`<h2>📖 How does YOUR story end?</h2><p class="story-text" style="font-size:18px">${st}</p><input type="text" id="tEnd" maxlength="140" placeholder="In the end, ..."><button class="btn primary" id="tGo">The End ✨</button>`, (el, done) => {
+      const inp = el.querySelector('#tEnd'); setTimeout(() => inp.focus(), 50);
+      el.querySelector('#tGo').onclick = () => { if (!words(inp.value)) { inp.style.borderColor = '#f26b21'; inp.placeholder = 'Type a few words. Any ending is great!'; return; } done(inp.value.trim()); };
+    });
+    S.tale = { who: this.rows.h[p.h.idx][1], where: this.rows.v[p.v.idx][1], problem: this.rows.q[p.q.idx][1], ending: end, words: words(end) }; L.rec.extra = { ...S.tale };
+    panel(`<div class="tale">${st} <b class="fill">${end.replace(/[<>&]/g, '')}</b></div>`);
+    Sound.sfx('cheer'); confetti(40); openGate(); say('What a story! 📖✨ Walk to the gate ⬇️');
+  },
+  update: (L, dt, t) => bob(t),
+};
+
+/* ---------- N4 Mirror Twins (logic, hard) ---------- */
+NEW.N4 = {
+  id: 'N4', name: 'Mirror Twins', emoji: '🪞', skill: 'logic', skillLabel: 'Logic',
+  map: ['#############', '#.F...#..G..#', '#.....#.....#', '#.....#...#.#', '#.....#.....#', '#..S..#.....#', '###E#########'],
+  intro: 'Meet your mirror twin! 🪞 When you step LEFT, your twin steps RIGHT. Get YOU on the 🟧 flag and your TWIN on the 🟦 flag at the same time!',
+  goal: 'You on 🟧, twin on 🟦, at the same time. ↺ Reset if stuck',
+  hints: ['Your twin copies you, but left and right are swapped ↔️', 'Walls can stop your twin while you keep moving 🧱', 'Move one step at a time and watch your twin 👀'],
+  setup(L) {
+    for (const row of grid) for (const c of row) {
+      if (c.t === 'F' || c.t === 'G') { const col = c.t === 'F' ? '#f26b21' : '#3b82f6'; mesh(new THREE.MeshLambertMaterial({ color: col, emissive: col, emissiveIntensity: 0.3 }), wx(c.x), 0.03, wz(c.z), 0.9, 0.06, 0.9); mesh('log', wx(c.x) + 0.35, 0.8, wz(c.z) - 0.35, 0.08, 1.6, 0.08); const fl = mesh(new THREE.MeshLambertMaterial({ color: col }), wx(c.x) + 0.62, 1.4, wz(c.z) - 0.35, 0.5, 0.35, 0.04); fl.userData.flag = 1; if (c.t === 'F') L.F = [c.x, c.z]; else L.G = [c.x, c.z]; c.t = '.'; }
+    }
+    for (let z = 1; z < GH - 1; z++) { const gl = mesh(new THREE.MeshLambertMaterial({ color: '#9be3ff', transparent: true, opacity: 0.5, emissive: '#4fc3ff', emissiveIntensity: 0.3 }), wx(6), 1.5, wz(z), 0.3, 1, 0.9); }
+    const h = player.hero; const tw = blockyPerson('#3b82f6', h.skin, h.hair); tw.traverse(o => { if (o.material) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.8; o.material.emissive = new THREE.Color('#4fc3ff'); o.material.emissiveIntensity = 0.25; } }); world.add(tw);
+    L.tw = { g: tw }; this.placeTwin(L); show('#btnReset', true);
+  },
+  placeTwin(L) { L.tw.x = GW - 1 - L.start[0]; L.tw.z = L.start[1]; L.tw.g.position.set(wx(L.tw.x), 0, wz(L.tw.z)); },
+  onTry(dx, dz) {
+    if (L.solved) return; const T = L.tw, nx = T.x - dx, nz = T.z + dz, c = cell(nx, nz); T.g.rotation.y = Math.atan2(-dx, dz);
+    if (c && !isSolid(c) && c.t !== 'E') { const fx = wx(T.x), fz = wz(T.z); T.x = nx; T.z = nz; tween(0.15, k => { T.g.position.x = fx + (wx(nx) - fx) * k; T.g.position.z = fz + (wz(nz) - fz) * k; T.g.position.y = Math.sin(k * Math.PI) * 0.16; }); }
+    else { const o = T.g.position.clone(); tween(0.16, k => { const s = Math.sin(k * Math.PI) * 0.15; T.g.position.x = o.x - dx * s; T.g.position.z = o.z + dz * s; }); }
+    setTimeout(() => this.check(L), 200);
+  },
+  check(L) {
+    if (L.solved || !L.F) return;
+    if (player.x === L.F[0] && player.z === L.F[1] && L.tw.x === L.G[0] && L.tw.z === L.G[1]) { L.solved = true; show('#btnReset', false); openGate(); Sound.sfx('cheer'); confetti(40); tween(0.8, k => L.tw.g.position.y = Math.abs(Math.sin(k * Math.PI * 3)) * 0.5); say('Both on the flags! 🎉 Teamwork! Walk to the gate ⬇️'); }
+  },
+  reset(L, byUser) { if (L.solved) return; placePlayer(L.start[0], L.start[1]); this.placeTwin(L); if (byUser) { L.rec.fails++; L.rec.attempts++; L.rec.firstTry = false; Sound.sfx('click'); say('Fresh start! 🔄 Watch your twin closely.', 2500); } },
+  onEnter() { }, update(L, dt, t) { world.children.forEach(o => { if (o.userData.flag) o.rotation.y = Math.sin(t / 300) * 0.3; }); },
+};
+
+/* ---------- N5 Fix the Robot (AI, harder) ---------- */
+NEW.N5 = {
+  id: 'N5', name: 'Fix the Robot', emoji: '🔧', skill: 'ai', skillLabel: 'Basics of AI',
+  map: ['###########', '#....R....#', '#..1.2.3..#', '#.........#', '#..4.5.6..#', '#....S...x#', '#####E#####'],
+  rounds: [[['🐱', 'cat', 1], ['🐶', 'cat', 0, 'dog'], ['🐟', 'fish', 1], ['🐦', 'fish', 0, 'bird'], ['🐮', 'cow', 1], ['🐸', 'frog', 1]],
+           [['🚗', 'car', 1], ['🍎', 'car', 0, 'apple'], ['🚲', 'bike', 1], ['🍌', 'banana', 1], ['✈️', 'banana', 0, 'plane'], ['⚽', 'ball', 1]]],
+  intro: 'Robo put name labels on these pictures, but some labels are WRONG! 🔧 Walk onto each WRONG card to fix it.',
+  goal: 'Find and fix the wrong labels',
+  hints: ['Read each label, then look at its picture. Do they match?', 'AI can make mistakes. People check its work! 🕵️'],
+  solid: c => c.t === 'R',
+  setup(L) { L.round = 0; L.pads = []; for (const row of grid) for (const c of row) { if (/[1-6]/.test(c.t)) { addPad(c); L.pads.push(c); } if (c.t === 'R') L.bot = makeBot(c); } this.showRound(L); },
+  showRound(L) {
+    const items = shuffle(this.rounds[L.round]); L.left = items.filter(i => !i[2]).length;
+    L.pads.forEach((c, i) => { const it = items[i]; c.it = it; c.fixed = false; c.trigger = true; c.padObj.material = M.pad; if (c.card) world.remove(c.card); c.card = cardSprite(it[0], it[1] + '?', 1.05); c.card.position.set(wx(c.x), 1.0, wz(c.z)); world.add(c.card); });
+    this.render(L); if (L.round) say('Round 2! Robo labeled new pictures. Check them all 🕵️', 3000);
+  },
+  render(L) { panel(`<div class="pbig">🔧 Round ${L.round + 1} of 2 · Wrong labels left: <b>${L.left}</b></div>`); },
+  onEnter(c) {
+    if (!c.it || !c.trigger) return; c.trigger = false;
+    if (!c.it[2]) {
+      world.remove(c.card); c.card = cardSprite(c.it[0], c.it[3] + ' ✓', 1.05, '#d8f5d0'); c.card.position.set(wx(c.x), 1.0, wz(c.z)); world.add(c.card); c.padObj.material = M.gold;
+      Sound.sfx('good'); burst(c.card.position, '#2fa86b', 14); L.left--; this.render(L); botHop(L.bot);
+      if (L.left <= 0) {
+        L.round++;
+        if (L.round >= this.rounds.length) { L.pads.forEach(p => p.trigger = false); openGate(); panel(`<div class="pbig">✅ All fixed! Real AI needs people like you to check it.</div>`); say('Great checking! 🕵️✅ Walk to the gate ⬇️'); }
+        else { L.locked = true; setTimeout(() => { this.showRound(L); backToStart(0); }, 1200); }
+      }
+    } else { world.remove(c.card); c.card = cardSprite(c.it[0], c.it[1] + ' ✓', 1.05, '#d8f5d0'); c.card.position.set(wx(c.x), 1.0, wz(c.z)); world.add(c.card); failLevel('That label was already right ✅ Keep checking the others!'); }
+  },
+  update(L, dt, t) { bob(t); if (L.bot && !anims.length) L.bot.rotation.y = Math.sin(t / 800) * 0.3; },
+};
+
+/* ---------- N6 Dream Machine (creativity) ---------- */
+NEW.N6 = {
+  id: 'N6', name: 'Dream Machine', emoji: '💡', skill: 'creativity', skillLabel: 'Creativity',
+  map: ['#########', '#.1.2.3.#', '#.......#', '#...M...#', '#.......#', '#.4.5.6.#', '#b..S..x#', '####E####'],
+  parts: [['🪽', 'wings'], ['🛞', 'wheels'], ['🚀', 'rocket'], ['🧲', 'magnet'], ['☂️', 'umbrella'], ['🤖', 'robot arm'], ['🌈', 'rainbow'], ['🎵', 'music']],
+  intro: 'Invent something NEW! 💡 Walk onto any 2 parts to drop them into the Dream Machine.',
+  goal: 'Pick any 2 parts for your invention',
+  hints: ['Any 2 parts work! There is no wrong answer here 🙂', 'Imagine: what could these parts do together? 🤔'], noSkip: true,
+  solid: c => c.t === 'M',
+  setup(L) {
+    L.chosen = []; const parts = shuffle(this.parts).slice(0, 6); let i = 0;
+    for (const row of grid) for (const c of row) {
+      if (/[1-6]/.test(c.t)) { addPad(c); c.part = parts[i++]; c.card = cardSprite(c.part[0], c.part[1], 1.0); c.card.position.set(wx(c.x), 1.0, wz(c.z)); world.add(c.card); }
+      if (c.t === 'M') { const g = new THREE.Group(); g.position.set(wx(c.x), 0, wz(c.z)); mesh(M.brick, 0, 0.5, 0, 1.2, 1, 1.2, g); mesh(new THREE.MeshLambertMaterial({ color: '#9be3ff', transparent: true, opacity: 0.6 }), 0, 1.3, 0, 0.9, 0.6, 0.9, g); mesh(M.gold, 0, 1.75, 0, 0.3, 0.3, 0.3, g); [-0.62, 0.62].forEach(x => mesh(new THREE.MeshLambertMaterial({ color: '#f26b21', emissive: '#f26b21', emissiveIntensity: 0.6 }), x, 0.7, 0.3, 0.06, 0.2, 0.2, g)); world.add(g); L.mach = g; }
+    }
+    this.render(L);
+  },
+  render(L) { const s2 = i => L.chosen[i] ? `<b class="fill">${L.chosen[i][0]} ${L.chosen[i][1]}</b>` : `<b class="blank now">❓</b>`; panel(`<div class="tale">💡 ${s2(0)} ＋ ${s2(1)} ＝ ✨ your invention!</div>`); },
+  onEnter(c) {
+    if (!c.part || c.used || L.chosen.length >= 2) return; c.used = true; c.trigger = false; L.chosen.push(c.part); Sound.sfx('good');
+    const o = c.card, a = o.position.clone(), b = L.mach.position.clone().setY(1.4); tween(0.6, k => { o.position.lerpVectors(a, b, k); o.position.y += Math.sin(k * Math.PI) * 1.2; o.scale.setScalar(1 - k * 0.6); }, () => { world.remove(o); burst(b, '#ffd23f', 12); });
+    this.render(L); if (L.chosen.length === 2) this.invent(L); else say('Great! Pick ONE more part 💡', 0);
+  },
+  async invent(L) {
+    L.locked = true; await sleep(700); Sound.sfx('fire'); tween(1.2, k => { L.mach.rotation.y = Math.sin(k * 30) * 0.08; L.mach.scale.setScalar(1 + Math.sin(k * Math.PI) * 0.2); }); await sleep(1300); burst(L.mach.position.clone().setY(2), '#ff4f8b', 30, 3); Sound.sfx('boom');
+    const [a, b] = L.chosen;
+    const res = await modal(`<h2>${a[0]} + ${b[0]} = ✨</h2><p class="story-text">You invented something! What is it?</p><input type="text" id="iName" maxlength="40" placeholder="Name it (example: Sky Scooter)"><input type="text" id="iDoes" maxlength="140" placeholder="What does it do? (one line)"><button class="btn primary" id="iGo">Show everyone 🎉</button>`, (el, done) => {
+      const n = el.querySelector('#iName'); setTimeout(() => n.focus(), 50);
+      el.querySelector('#iGo').onclick = () => { if (!words(n.value)) { n.style.borderColor = '#f26b21'; n.placeholder = 'Give it any name you like!'; return; } done({ name: n.value.trim(), does: el.querySelector('#iDoes').value.trim() }); };
+    });
+    S.invent = { parts: [a[1], b[1]], name: res.name, does: res.does, words: words(res.does) }; L.rec.extra = { ...S.invent };
+    const sp = cardSprite(a[0] + b[0], res.name.slice(0, 14), 1.4); sp.position.set(L.mach.position.x, 2.8, L.mach.position.z); world.add(sp); L.show = sp;
+    Sound.sfx('cheer'); confetti(50); openGate(); say(`Wow, the "${res.name.replace(/[<>&]/g, '')}"! 🤩 Walk to the gate ⬇️`);
+  },
+  update(L, dt, t) { bob(t); if (L.show) L.show.position.y = 2.8 + Math.sin(t / 300) * 0.15; },
+};
+
 const LEVELS = [
 {
   id: 'L1', name: 'Ember Gate', emoji: '🔥', skill: 'tutorial', skillLabel: 'Warm-up',
@@ -582,7 +978,7 @@ const LEVELS = [
     const path = { '3,1': 'O', '4,1': 'B', '4,2': 'O', '5,2': 'B', '5,3': 'O', '6,3': 'B', '7,3': 'O' };
     const fill = ['B', 'O', 'O', 'B', 'B', 'O', 'O', 'O', 'B', 'B', 'O', 'B', 'B'];
     let fi = 0; L.stones = [];
-    const water = new THREE.Mesh(BOX, new THREE.MeshLambertMaterial({ color: '#2f8fe0', transparent: true, opacity: 0.8 })); water.scale.set(5, 0.1, 4); water.position.set(wx(5), -0.35, (wz(1) + wz(4)) / 2); world.add(water); L.water = water;
+    const water = new THREE.Mesh(BOX, M.water); M.water.map.repeat.set(5, 4); water.scale.set(5, 0.1, 4); water.position.set(wx(5), -0.35, (wz(1) + wz(4)) / 2); world.add(water); L.water = water;
     for (const row of grid) for (const c of row) if (c.t === 'z') {
       c.col = path[c.x + ',' + c.z] || fill[fi++ % fill.length];
       const m = new THREE.MeshLambertMaterial({ color: c.col === 'O' ? '#f26b21' : '#3b82f6', emissive: c.col === 'O' ? '#f26b21' : '#3b82f6', emissiveIntensity: 0.1 });
@@ -603,8 +999,9 @@ const LEVELS = [
       setTimeout(() => { s.position.y = -0.15; s.rotation.z = 0; L.last = null; L.stones.forEach(q => q.stone.material.emissiveIntensity = 0.1); backToStart(0); }, 1100);
     }
   },
-  update(L, dt, t) { for (let i = 0; i < 6; i++) { const b = L['ban' + i]; if (b) { b.position.y = 2.7 + Math.sin(t / 300 + i * 0.7) * 0.1; b.rotation.y += dt; } } },
+  update(L, dt, t) { M.water.map.offset.x += dt * 0.25; M.water.map.offset.y = Math.sin(t / 1500) * 0.05; for (let i = 0; i < 6; i++) { const b = L['ban' + i]; if (b) { b.position.y = 2.7 + Math.sin(t / 300 + i * 0.7) * 0.1; b.rotation.y += dt; } } },
 },
+NEW.N1,
 {
   id: 'L3', name: 'Gearbot\'s Guess', emoji: '🤖', skill: 'ai', skillLabel: 'Basics of AI',
   map: ['###########', '#....G....#', '#.........#', '#.1.2.3.4.#', '#.........#', '#x...S..o.#', '#####E#####'],
@@ -626,7 +1023,7 @@ const LEVELS = [
         mesh(m('#555'), 0, 0.95, 0, 0.06, 0.3, 0.06, g); mesh(M.gold, 0, 1.12, 0, 0.14, 0.14, 0.14, g); mesh(m('#7c8aa3'), -0.45, 0.45, 0, 0.16, 0.5, 0.16, g); mesh(m('#7c8aa3'), 0.45, 0.45, 0, 0.16, 0.5, 0.16, g);
         g.position.set(wx(c.x), 0, wz(c.z)); world.add(g); L.bot = g; }
     }
-    LEVELS[2].showRound(L);
+    this.showRound(L);
   },
   showRound(L) {
     const R = this.rounds[L.round]; L.disp.clear(); const z = wz(0) + 0.2; let y = 1.6;
@@ -663,6 +1060,67 @@ const LEVELS = [
   update(L, dt, t) { bob(t); if (L.bot && !anims.length) L.bot.rotation.y = Math.sin(t / 800) * 0.3; },
 },
 {
+  id: 'L5', name: 'Story Stones', emoji: '📖', skill: 'story', skillLabel: 'Storytelling',
+  map: ['###########', '#....T....#', '#.........#', '#..1.2.3..#', '#b........#', '#*#.S...x#', '#####E#####'],
+  intro: 'Put the story in order! 📖 Walk onto (or tap) the picture that comes FIRST. It flies into slot 1.',
+  goal: 'Fill the slots: 1 FIRST ➜ 2 NEXT ➜ 3 LAST',
+  hints: ['What happens at the very START of this life?', 'Things start small and grow bigger 🌱', 'Made a mistake? Press ↶ Undo and try again.'],
+  stories: [[['🥚', 'egg'], ['🐣', 'chick'], ['🐔', 'hen']], [['seed', 'seed'], ['🌱', 'sprout'], ['🌳', 'tree']], [['🐛', 'caterpillar'], ['cocoon', 'cocoon'], ['🦋', 'butterfly']]],
+  solid: c => c.t === 'T',
+  setup(L) {
+    L.round = 0; L.pads = []; L.placed = [];
+    for (const row of grid) for (const c of row) {
+      if (/[1-3]/.test(c.t)) { addPad(c); L.pads.push(c); }
+      if (c.t === 'T') { mesh('log', wx(c.x), 0.4, wz(c.z), 0.6, 0.8, 0.6); const o = sprite('🦉', 1.1); o.position.set(wx(c.x), 1.35, wz(c.z)); world.add(o); L.owl = o; }
+    }
+    this.showRound(L);
+  },
+  async start(L) {
+    // animated example before round 1
+    L.locked = true;
+    const ex = [['👶', 'baby'], ['🧒', 'kid'], ['🧑', 'grown-up']];
+    await modal(`<h2>How to play 📖</h2><p class="story-text" style="font-size:19px">Stories go in order. Watch!</p><div class="seq demo">${[0, 1, 2].map(i => `<div class="slot" id="dx${i}"><div class="sc"></div><b>${i + 1}</b><span>${['FIRST', 'NEXT', 'LAST'][i]}</span></div>${i < 2 ? '<div class="arr">➜</div>' : ''}`).join('')}</div><div class="dcards" id="dcards">${[2, 0, 1].map(i => `<span id="dc${i}">${cardImg(ex[i][0], ex[i][1])}</span>`).join('')}</div><p id="dsay" class="story-text" style="min-height:30px;font-size:19px"></p><button class="btn" id="dAgain" style="background:#ddd;color:#1a2a4f">↻ Show again</button> <button class="btn primary" id="dGo" disabled>Got it! ▶</button>`, (el, done) => {
+      const run = async () => { el.querySelector('#dGo').disabled = true; [0, 1, 2].forEach(i => { el.querySelector('#dx' + i + ' .sc').innerHTML = ''; el.querySelector('#dc' + i).style.visibility = 'visible'; }); el.querySelector('#dsay').textContent = '';
+        for (let i = 0; i < 3; i++) { await sleep(900); el.querySelector('#dc' + i).style.visibility = 'hidden'; el.querySelector('#dx' + i + ' .sc').innerHTML = `<div class="fly">${cardImg(ex[i][0], ex[i][1])}</div>`; el.querySelector('#dsay').textContent = ['1 FIRST: a baby 👶', '2 NEXT: the baby grows into a kid 🧒', '3 LAST: the kid grows up 🧑'][i]; Sound.tone(440 + i * 160, 0.15, 'triangle', 0.2); }
+        await sleep(500); el.querySelector('#dGo').disabled = false; };
+      el.querySelector('#dAgain').onclick = run; el.querySelector('#dGo').onclick = () => done(); run();
+    });
+    L.locked = false; say(this.intro);
+  },
+  render(L) {
+    panel(`<div class="seq">${[0, 1, 2].map(i => { const c = L.placed[i]; return `<div class="slot ${c ? 'full' : i === L.placed.length ? 'next' : ''}"><div class="sc">${c ? `<div class="fly">${cardImg(...c.st)}</div>` : '?'}</div><b>${i + 1}</b><span>${['FIRST', 'NEXT', 'LAST'][i]}</span></div>${i < 2 ? '<div class="arr">➜</div>' : ''}`; }).join('')}<button id="seqUndo" class="undo" ${L.placed.length ? '' : 'disabled'}>↶ Undo</button></div><div class="small2">Story ${L.round + 1} of 3</div>`);
+    $('#seqUndo').onclick = () => this.undo(L);
+  },
+  showRound(L) {
+    const st = this.stories[L.round]; const order = shuffle([0, 1, 2]); L.placed = [];
+    L.pads.forEach((c, i) => { c.item = order[i]; c.st = st[c.item]; c.used = false; c.trigger = true; if (c.card) world.remove(c.card); c.card = cardSprite(c.st[0], c.st[1], 1.15); c.card.position.set(wx(c.x), 1.05, wz(c.z)); world.add(c.card); c.padObj.material = M.pad; });
+    this.render(L);
+  },
+  place(L, c) {
+    if (c.used || L.placed.length >= 3 || L.checking) return; c.used = true; L.placed.push(c); Sound.tone(440 + L.placed.length * 160, 0.15, 'triangle', 0.2); c.padObj.material = M.gold;
+    const o = c.card; const a = o.position.clone(); tween(0.45, k => { o.position.set(a.x, a.y + k * 3, a.z); o.material.opacity = 1 - k; }, () => { o.visible = false; });
+    this.render(L);
+    if (L.placed.length === 3) this.check(L);
+  },
+  undo(L) { if (L.checking) return; const c = L.placed.pop(); if (!c) return; Sound.sfx('click'); c.used = false; c.padObj.material = M.pad; c.card.visible = true; c.card.material.opacity = 1; c.card.position.set(wx(c.x), 1.05, wz(c.z)); L.rec.extra.undos = (L.rec.extra.undos || 0) + 1; this.render(L); },
+  check(L) {
+    L.checking = true; const ok = L.placed.every((c, i) => c.item === i);
+    if (ok) {
+      Sound.sfx('good'); tween(0.6, k => L.owl.position.y = 1.35 + Math.sin(k * Math.PI) * 0.6); document.querySelectorAll('#panel .slot').forEach(s2 => s2.classList.add('win'));
+      L.round++;
+      if (L.round >= this.stories.length) { L.pads.forEach(p => { p.trigger = false; }); openGate(); say('You are a Story Master! 🦉📖 The gate is open ⬇️'); }
+      else { say('Hoo-hoo! 🦉 Perfect order! Here comes the next story…', 2500); L.locked = true; setTimeout(() => { L.checking = false; this.showRound(L); backToStart(0); }, 1500); }
+    } else {
+      L.rec.extra['miss' + L.round] = 1; failLevel('Hmm, not quite! 🦉 Which one comes at the very START?'); document.querySelectorAll('#panel .slot').forEach(s2 => s2.classList.add('shake'));
+      L.locked = true; setTimeout(() => { L.checking = false; L.placed.slice().reverse().forEach(() => { const c = L.placed.pop(); c.used = false; c.padObj.material = M.pad; c.card.visible = true; c.card.material.opacity = 1; c.card.position.set(wx(c.x), 1.05, wz(c.z)); }); this.render(L); backToStart(0); }, 1400);
+    }
+  },
+  onEnter(c) { if (c.item === undefined || !c.trigger) return; this.place(L, c); },
+  onPointer(L, ray) { const cs = L.pads.filter(c => !c.used && c.card.visible); const hit = ray.intersectObjects(cs.map(c => c.card), false)[0]; if (hit) { const c = cs.find(q => q.card === hit.object); this.place(L, c); return true; } return false; },
+  update(L, dt, t) { bob(t); if (L.owl) L.owl.material.rotation = Math.sin(t / 500) * 0.1; L.pads.forEach((c, i) => { if (c.card && !c.used) c.card.position.y = 1.05 + Math.sin(t / 350 + i) * 0.08; }); },
+},
+NEW.N2,
+{
   id: 'L4', name: 'Crate Crush', emoji: '📦', skill: 'logic', skillLabel: 'Planning',
   map: ['##########', '#S...#...#', '#.C..#.o.#', '#..C...PP#', '#....#...#', '#x...#...#', '#######E##'],
   intro: 'Push the 📦 crates onto the 🟨 yellow plates to open the gate!',
@@ -696,46 +1154,7 @@ const LEVELS = [
   },
   onEnter() { }, update: (L, dt, t) => bob(t),
 },
-{
-  id: 'L5', name: 'Story Stones', emoji: '📖', skill: 'story', skillLabel: 'Storytelling',
-  map: ['###########', '#....T....#', '#.........#', '#..1.2.3..#', '#b........#', '#*#.S...x.#', '#####E#####'],
-  intro: 'Tell the story in order! 📖 Walk onto what happens FIRST, then NEXT, then LAST.',
-  goal: 'Step on the pictures in story order: 1️⃣ ➡️ 2️⃣ ➡️ 3️⃣',
-  hints: ['What happens at the start? What happens at the end?', 'Small things often grow into big things 🌱', 'Tell the story out loud in your head, then walk.'],
-  stories: [['🌱', '🌳', '🍎'], ['🥚', '🐣', '🐔'], ['☁️', '🌧️', '🌈']],
-  solid: c => c.t === 'T',
-  setup(L) {
-    L.round = 0; L.next = 0; L.pads = []; L.badges = [];
-    for (const row of grid) for (const c of row) {
-      if (/[1-3]/.test(c.t)) { addPad(c); L.pads.push(c); }
-      if (c.t === 'T') { mesh('log', wx(c.x), 0.4, wz(c.z), 0.6, 0.8, 0.6); const o = sprite('🦉', 1.1); o.position.set(wx(c.x), 1.35, wz(c.z)); world.add(o); L.owl = o; }
-    }
-    const b = sprite('📖', 0.9); b.position.set(wx(5) + 2, 2.5, wz(0)); world.add(b);
-    ['1️⃣', '➡️', '2️⃣', '➡️', '3️⃣'].forEach((e, i) => { const s = sprite(e, 0.5); s.position.set(wx(5) - 1.6 + i * 0.8, 2.6, wz(0)); world.add(s); });
-    this.showRound(L);
-  },
-  showRound(L) {
-    const st = this.stories[L.round]; const order = shuffle([0, 1, 2]); L.next = 0;
-    L.badges.forEach(b => world.remove(b)); L.badges = [];
-    L.pads.forEach((c, i) => { c.item = order[i]; c.doneStep = false; if (c.card) world.remove(c.card); c.card = sprite(st[c.item], 0.95, '#fff6ec'); c.card.position.set(wx(c.x), 1.0, wz(c.z)); world.add(c.card); c.padObj.material = M.pad; });
-  },
-  onEnter(c) {
-    if (c.item === undefined || c.doneStep || !c.trigger) return;
-    if (c.item === L.next) {
-      c.doneStep = true; L.next++; Sound.tone(440 + L.next * 160, 0.15, 'triangle', 0.2); c.padObj.material = M.gold;
-      const b = sprite(['1️⃣', '2️⃣', '3️⃣'][L.next - 1], 0.5); b.position.set(wx(c.x), 1.75, wz(c.z)); world.add(b); L.badges.push(b);
-      if (L.next === 3) {
-        Sound.sfx('good'); L.round++; tween(0.6, k => L.owl.position.y = 1.35 + Math.sin(k * Math.PI) * 0.6); Sound.tone(392, 0.2, 'sine', 0.2, 0.1); Sound.tone(330, 0.3, 'sine', 0.2, 0.3);
-        if (L.round >= this.stories.length) { L.pads.forEach(p => p.trigger = false); openGate(); say('What a great storyteller! 🦉📖 The gate is open ⬇️'); }
-        else { say('Hoo-hoo! 🦉 Great story! Here comes another one…', 2500); L.locked = true; setTimeout(() => { this.showRound(L); backToStart(0); }, 1200); }
-      }
-    } else {
-      L.rec.extra['miss' + L.round] = 1; failLevel('Hmm, that part comes at a different time. Try again! 🦉');
-      L.locked = true; setTimeout(() => { this.showRound(L); backToStart(0); }, 900);
-    }
-  },
-  update(L, dt, t) { bob(t); if (L.owl) L.owl.material.rotation = Math.sin(t / 500) * 0.1; },
-},
+NEW.N6,
 {
   id: 'L6', name: 'Speaker\'s Stage', emoji: '🎤', skill: 'speaking', skillLabel: 'Public Speaking',
   map: ['###########', '#..sssss..#', '#..ssMss..#', '#.........#', '#.c.c.c.c.#', '#x...S...o#', '#####E#####'],
@@ -780,60 +1199,115 @@ const LEVELS = [
   },
   update(L, dt, t) { bob(t); if (L.ring) L.ring.material.opacity = 0.35 + Math.sin(t / 200) * 0.25; },
 },
+NEW.N3,
+NEW.N5,
 {
-  id: 'L7', name: 'Builder\'s Plot', emoji: '🧱', skill: 'creativity', skillLabel: 'Creativity',
+  id: 'L7', name: 'Builder\'s Plot', emoji: '🧱', skill: 'creativity', skillLabel: 'Build Challenge',
   map: ['..........', '.pppppppp.', '.pppppppp.', '.pppppppp.', '.pppppppp.', '.pppppppp.', '..........'],
-  intro: 'Free build! 🧱 Build a gift for Promo\'s fort. Anything you like! Tap to place blocks.',
-  goal: 'Build anything! Then press ✅ Done', noWalk: true, noSkip: true,
+  intro: 'BUILD CHALLENGE! 🧱 Copy the model on the stand: same shape, same colors. Tap the glowing square to place blocks.',
+  goal: 'Build the SAME model before time runs out ⏱️', noWalk: true, noSkip: true,
+  hints: ['Pick the right color block first, then tap 🎨', 'Build the bottom layer first, then go up ⬆️', 'Tap the TOP of a block to stack on it.'],
   mats: [['brick', '#7c8594', '🧱'], ['plank', '#b5834c', '🪵'], ['leaves', '#3f8f35', '🌿'], ['gold', '#ffd23f', '✨'], ['glass', '#9be3ff', '💎'], ['navy', '#1a2a4f', '🟦'], ['orange', '#f26b21', '🔥']],
+  zone: [2, 2],
+  targets: [
+    { name: 'Little Wall', time: 90, ghost: true, b: [[0, 0, 1, 'plank'], [1, 0, 1, 'plank'], [2, 0, 1, 'plank'], [1, 1, 1, 'gold']] },
+    { name: 'Torch Tower', time: 90, b: [[1, 0, 0, 'brick'], [0, 0, 1, 'brick'], [1, 0, 1, 'brick'], [2, 0, 1, 'brick'], [1, 0, 2, 'brick'], [1, 1, 1, 'brick'], [1, 2, 1, 'orange']] },
+    { name: 'Tiny House', time: 120, b: [[0, 0, 0, 'brick'], [1, 0, 0, 'brick'], [2, 0, 0, 'brick'], [0, 0, 1, 'brick'], [1, 0, 1, 'brick'], [2, 0, 1, 'brick'], [0, 0, 2, 'brick'], [2, 0, 2, 'brick'], [0, 1, 1, 'plank'], [1, 1, 1, 'plank'], [2, 1, 1, 'plank'], [1, 2, 1, 'gold']] },
+  ],
   setup(L) {
-    L.start = [0, 3]; L.blocks = new Map(); L.history = []; L.placed = 0; L.mat = 'brick'; L.erase = false;
+    L.start = [0, 3]; L.blocks = new Map(); L.history = []; L.placed = 0; L.mat = 'brick'; L.erase = false; L.round = -1; L.results = []; L.mode = 'challenge';
     if (!M.glass) { M.glass = new THREE.MeshLambertMaterial({ color: '#9be3ff', transparent: true, opacity: 0.6 }); M.navy = std({ color: '#1a2a4f' }); M.orange = std({ color: '#f26b21', emissive: '#f26b21', emissiveIntensity: 0.3 }); }
-    for (const row of grid) for (const c of row) if (c.t === 'p') mesh('dirt', wx(c.x), 0.01, wz(c.z), 0.98, 0.04, 0.98);
-    const bar = $('#buildBar'); bar.innerHTML = this.mats.map(([m, col, e]) => `<button data-m="${m}" style="background:${col}" class="${m === 'brick' ? 'sel' : ''}">${e}</button>`).join('') + `<button class="txt" data-x="erase">🧽</button><button class="txt" data-x="undo">↶</button><button class="txt done" data-x="done">✅ Done</button>`;
+    const [zx, zz] = this.zone;
+    for (const row of grid) for (const c of row) if (c.t === 'p') { const inZ = c.x >= zx && c.x < zx + 3 && c.z >= zz && c.z < zz + 3; const d = mesh(inZ ? new THREE.MeshLambertMaterial({ color: '#c9a36a', emissive: '#f26b21', emissiveIntensity: 0.12 }) : 'dirt', wx(c.x), 0.01, wz(c.z), 0.98, 0.04, 0.98); if (inZ) c.zoneObj = d; }
+    // zone frame
+    const fm = new THREE.MeshBasicMaterial({ color: '#f26b21' }); const cx = wx(zx + 1), cz = wz(zz + 1);
+    [[cx, cz - 1.55, 3.2, 0.1], [cx, cz + 1.55, 3.2, 0.1], [cx - 1.55, cz, 0.1, 3.2], [cx + 1.55, cz, 0.1, 3.2]].forEach(([x, z, sx, sz]) => mesh(fm, x, 0.06, z, sx, 0.06, sz));
+    // pedestal
+    mesh('stone', wx(6.5), 0.5, wz(3), 1.8, 1, 1.8); mesh(M.gold, wx(6.5), 1.03, wz(3), 1.9, 0.06, 1.9);
+    L.model = new THREE.Group(); L.model.position.set(wx(6.5), 1.06, wz(3)); world.add(L.model);
+    const sg = sprite('👀', 0.6); sg.position.set(wx(6.5), 3.1, wz(3)); world.add(sg);
+    L.ghost = new THREE.Group(); world.add(L.ghost);
+    const bar = $('#buildBar'); bar.innerHTML = this.mats.map(([m, col, e]) => `<button data-m="${m}" style="background:${col}" class="${m === 'brick' ? 'sel' : ''}">${e}</button>`).join('') + `<button class="txt" data-x="erase">🧽</button><button class="txt" data-x="undo">↶</button><button class="txt done" data-x="done">✅ Check</button>`;
     bar.querySelectorAll('button').forEach(b => b.onclick = () => { Sound.sfx('click'); const x = b.dataset.x;
       if (b.dataset.m) { L.mat = b.dataset.m; L.erase = false; bar.querySelectorAll('button').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); }
       else if (x === 'erase') { L.erase = !L.erase; bar.querySelectorAll('button').forEach(q => q.classList.remove('sel')); b.classList.toggle('sel', L.erase); }
-      else if (x === 'undo') { const k = L.history.pop(); if (k && L.blocks.has(k)) { world.remove(L.blocks.get(k).o); L.blocks.delete(k); } }
-      else if (x === 'done') this.finish(L);
+      else if (x === 'undo') { const k = L.history.pop(); if (k && L.blocks.has(k)) { world.remove(L.blocks.get(k).o); L.blocks.delete(k); this.live(L); } }
+      else if (x === 'done') { if (L.mode === 'challenge') { if (!L.blocks.size) say('Place some blocks first! 🧱', 2000); else this.endRound(L, 'check'); } else this.finish(L); }
     });
-    show('#buildBar', true); L.rec.t0 = now();
+    show('#buildBar', true); L.rec.t0 = now(); this.nextRound(L);
   },
   key: (x, y, z) => x + ',' + y + ',' + z,
+  clearBlocks(L) { L.blocks.forEach(b => world.remove(b.o)); L.blocks.clear(); L.history = []; },
+  nextRound(L) {
+    this.clearBlocks(L); L.round++; L.ghost.clear(); L.model.clear();
+    if (L.round >= this.targets.length) return this.afterChallenge(L);
+    const T = this.targets[L.round]; L.T = T; L.tLeft = T.time; L.ended = false; L.rt0 = now();
+    T.b.forEach(([x, y, z, m]) => { const o = mesh(m, (x - 1) * 0.45, y * 0.45 + 0.225, (z - 1) * 0.45, 0.45, 0.45, 0.45, L.model); });
+    if (T.ghost) { const gm = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.28, depthWrite: false }); T.b.forEach(([x, y, z]) => { const o = new THREE.Mesh(BOX, gm); o.position.set(wx(this.zone[0] + x), y + 0.5, wz(this.zone[1] + z)); o.scale.setScalar(0.96); L.ghost.add(o); }); }
+    panel(`<div class="bpanel"><b>Round ${L.round + 1}/3: ${T.name}</b><span id="bpTime">⏱️ ${T.time}s</span><span id="bpMatch">🎯 0%</span></div><div class="mbar"><i id="bpBar"></i></div>`);
+    say(['Round 1: Little Wall! The see-through blocks show where to build 👻', 'Round 2: Torch Tower! Look at the model on the stand 👀', 'Last round: Tiny House! 🏠 Look at every side of the model.'][L.round], 0);
+  },
+  match(L) { const T = L.T; if (!T) return 0; const [zx, zz] = this.zone; const tk = new Map(T.b.map(([x, y, z, m]) => [this.key(zx + x, y, zz + z), m])); let ok = 0, extra = 0; L.blocks.forEach((b, k) => { if (tk.get(k) === b.m) ok++; else extra++; }); return Math.round(100 * ok / (T.b.length + extra)); },
+  live(L) { if (L.mode !== 'challenge' || L.ended) return; const p = this.match(L); const el = $('#bpMatch'); if (el) { el.textContent = `🎯 ${p}%`; $('#bpBar').style.width = p + '%'; } if (p === 100) this.endRound(L, 'perfect'); },
+  async endRound(L, why) {
+    if (L.ended) return; L.ended = true; const pct = this.match(L), sec = Math.round(now() - L.rt0);
+    L.results.push({ name: L.T.name, acc: pct, sec, limit: L.T.time }); if (pct < 100) { L.rec.fails++; L.rec.firstTry = false; }
+    if (pct >= 80) { Sound.sfx('win'); confetti(40); } else Sound.sfx('good');
+    await showBanner(pct === 100 ? '🎯 Perfect match!' : why === 'time' ? `⏰ Time! ${pct}% match` : `${pct}% match! 👍`, 1600);
+    this.nextRound(L);
+  },
+  async afterChallenge(L) {
+    show('#panel', false); show('#buildBar', false); L.model.clear();
+    const rs = L.results.map(r => `<div class="rrow">${r.acc === 100 ? '🎯' : '🧱'} ${r.name}: <b>${r.acc}%</b> in ${r.sec}s</div>`).join('');
+    const free = await modal(`<h2>Challenge done! 🏆</h2>${rs}<p class="story-text" style="font-size:18px">Bonus: free build for 45 seconds? Build ANYTHING you like! 🎨</p><button class="btn" data-v="0" style="background:#ddd;color:#1a2a4f">Skip ➜</button> <button class="btn primary" data-v="1">🎨 Free build!</button>`, (el, done) => el.querySelectorAll('button').forEach(b => b.onclick = () => done(b.dataset.v === '1')));
+    if (!free) return this.finish(L);
+    L.mode = 'free'; L.tLeft = 45; L.ended = false; L.placed = 0; show('#buildBar', true); $('#buildBar [data-x=done]').textContent = '✅ Done';
+    panel(`<div class="bpanel"><b>🎨 Free build</b><span id="bpTime">⏱️ 45s</span></div>`); say('Build anything! 🎨 Press ✅ Done when you are happy.', 0);
+  },
   place(L, x, y, z) {
-    const c = cell(x, z); if (!c || c.t !== 'p' || y < 0 || y > 6) return; const k = this.key(x, y, z); if (L.blocks.has(k)) return;
-    if (L.blocks.size >= 120) { say('Wow, that\'s a lot of blocks! Press ✅ Done when ready.', 2500); return; }
-    const o = mesh(L.mat, wx(x), y + 0.5, wz(z)); o.userData.cell = [x, y, z]; o.scale.setScalar(0.01); tween(0.15, kk => o.scale.setScalar(0.01 + kk * 0.99));
+    if (L.ended || L.finishing) return; const c = cell(x, z); if (!c || c.t !== 'p' || y < 0 || y > 6) return;
+    const [zx, zz] = this.zone; if (L.mode === 'challenge' && (x < zx || x > zx + 2 || z < zz || z > zz + 2 || y > 3)) { say('Build inside the orange square 🟧', 1800); return; }
+    if (L.mode === 'free' && x >= 5 && x <= 7 && z >= 2 && z <= 4) return;
+    const k = this.key(x, y, z); if (L.blocks.has(k)) return;
+    if (L.blocks.size >= 120) return;
+    const o = mesh(L.mat, wx(x), y + 0.5, wz(z)); o.userData.cell = [x, y, z]; o.scale.setScalar(0.01); tween(0.18, kk => o.scale.setScalar(0.01 + kk * 0.99 + Math.sin(kk * Math.PI) * 0.15));
     L.blocks.set(k, { o, m: L.mat, x, y, z }); L.history.push(k); L.placed++; Sound.sfx('place'); burst(o.position, '#ffffff', 4, 1.5);
-    if (L.blocks.size === 5) say('Looking good! 🤩 Keep building, or press ✅ Done.', 3000);
+    this.live(L);
   },
   onPointer(L, ray) {
     const objs = [...L.blocks.values()].map(b => b.o); const hit = ray.intersectObjects(objs, false)[0];
     if (hit) {
       const [x, y, z] = hit.object.userData.cell;
-      if (L.erase) { const k = this.key(x, y, z); world.remove(hit.object); L.blocks.delete(k); Sound.sfx('bump'); return true; }
+      if (L.erase) { const k = this.key(x, y, z); world.remove(hit.object); L.blocks.delete(k); Sound.sfx('bump'); this.live(L); return true; }
       const n = hit.face.normal; this.place(L, x + Math.round(n.x), y + Math.round(n.y), z + Math.round(n.z)); return true;
     }
     const p = new THREE.Vector3(); if (ray.ray.intersectPlane(plane, p) && !L.erase) { this.place(L, Math.round(p.x + (GW - 1) / 2), 0, Math.round(p.z + (GH - 1) / 2)); }
     return true;
   },
   async finish(L) {
-    if (L.blocks.size < 5) { say(`Place at least 5 blocks first! (${L.blocks.size}/5) 🧱`, 2500); return; }
-    show('#buildBar', false);
+    if (L.finishing) return; L.finishing = true; show('#buildBar', false); show('#panel', false);
     const types = [['🏰', 'Fort'], ['🗼', 'Tower'], ['🐉', 'Creature'], ['🏠', 'Home'], ['🚀', 'Machine'], ['✨', 'Something new']];
-    const res = await modal(`<h2>What did you build? 🧱</h2><div class="choices">${types.map(([e, t]) => `<button class="choice" data-t="${t}"><span class="em">${e}</span>${t}</button>`).join('')}</div><input type="text" id="bName" maxlength="40" placeholder="Give it a name (optional)"><input type="text" id="bWhy" maxlength="140" placeholder="Why will Promo love it? (one line)"><button class="btn primary" id="bGo" disabled>Finish ✅</button>`, (el, done) => {
+    const res = await modal(`<h2>${L.mode === 'free' ? 'What did you build? 🧱' : 'Which build was your favorite? 🧱'}</h2><div class="choices">${types.map(([e, t]) => `<button class="choice" data-t="${t}"><span class="em">${e}</span>${t}</button>`).join('')}</div><input type="text" id="bName" maxlength="40" placeholder="Give it a name (optional)"><input type="text" id="bWhy" maxlength="140" placeholder="Why will Promo love it? (one line)"><button class="btn primary" id="bGo" disabled>Finish ✅</button>`, (el, done) => {
       let type = null; el.querySelectorAll('.choice').forEach(b => b.onclick = () => { type = b.dataset.t; el.querySelectorAll('.choice').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); el.querySelector('#bGo').disabled = false; Sound.sfx('click'); });
       el.querySelector('#bGo').onclick = () => done({ type, name: el.querySelector('#bName').value.trim(), why: el.querySelector('#bWhy').value.trim() });
     });
-    const bl = [...L.blocks.values()]; const mats = new Set(bl.map(b => b.m)); const foot = new Set(bl.map(b => b.x + ',' + b.z));
-    S.build = { blocks: bl.length, placedTotal: L.placed, materials: mats.size, height: Math.max(...bl.map(b => b.y + 1)), footprint: foot.size, type: res.type, name: res.name, why: res.why, whyWords: words(res.why), buildSec: Math.round(now() - L.rec.t0) };
-    L.rec.extra = { ...S.build };
+    const bl = L.mode === 'free' ? [...L.blocks.values()] : []; const mats = new Set(bl.map(b => b.m)); const foot = new Set(bl.map(b => b.x + ',' + b.z));
+    const R = L.results; const acc = R.length ? R.reduce((a, r) => a + r.acc, 0) / R.length / 100 : 0; const timeFrac = R.length ? R.reduce((a, r) => a + (r.acc === 100 ? Math.max(0, 1 - r.sec / r.limit) : 0), 0) / R.length : 0;
+    S.build = { rounds: R, acc: Math.round(acc * 100) / 100, timeFrac: Math.round(timeFrac * 100) / 100, perfect: R.filter(r => r.acc === 100).length, bonus: L.mode === 'free', blocks: bl.length, materials: mats.size, height: bl.length ? Math.max(...bl.map(b => b.y + 1)) : 0, footprint: foot.size, type: res.type, name: res.name, why: res.why, whyWords: words(res.why), buildSec: Math.round(now() - L.rec.t0) };
+    L.rec.extra = { ...S.build, rounds: R.map(r => `${r.name} ${r.acc}% ${r.sec}s`).join('; ') };
     say(`Promo LOVES it! 😍 "${(res.name || res.type).replace(/[<>&]/g, '')}"`, 3000); confetti(60); Sound.sfx('cheer');
     tween(1.5, k => { bl.forEach((b, i) => b.o.position.y = b.y + 0.5 + Math.abs(Math.sin(k * Math.PI * 2 + i * 0.3)) * 0.15); });
     await sleep(1600); completeLevel();
   },
-  update(L, dt, t) { },
+  update(L, dt, t) {
+    if (L.model) L.model.rotation.y += dt * 0.7;
+    if (L.ghost) L.ghost.children.forEach(o => o.material.opacity = 0.22 + Math.sin(t / 300) * 0.08);
+    if (L.ended || L.finishing || L.locked || L.round < 0 || L.round >= 3 && L.mode !== 'free') return;
+    L.tLeft -= dt; const el = $('#bpTime'); if (el) { el.textContent = `⏱️ ${Math.max(0, Math.ceil(L.tLeft))}s`; el.classList.toggle('low', L.tLeft < 15); }
+    if (L.tLeft <= 0) { if (L.mode === 'challenge') this.endRound(L, 'time'); else this.finish(L); }
+  },
 },
+NEW.N4,
 {
   id: 'L8', name: 'Shadow Golem', emoji: '👹', skill: 'boss', skillLabel: 'Final Boss!', music: 'boss', floor: 'stone', camZ: -1.2, sky: '#3d3a63',
   map: ['###########', '#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '#....S....#', '###########'],
@@ -841,7 +1315,7 @@ const LEVELS = [
   goal: 'Grab 🔥 to attack. Step OFF red tiles!',
   hints: ['When tiles turn RED, quickly step onto a normal tile!', 'Grab the glowing 🔥 ember. You throw it at the golem automatically!', 'Stay in the middle so you can move any way.'],
   setup(L) {
-    L.hearts = 3; L.hits = 0; L.need = 3; L.atkT = 3.5; L.warn = null; L.inv = 0; L.redObjs = [];
+    L.hearts = 3; L.hits = 0; L.need = 3; L.atkT = 6; L.fightT = 0; L.paused = true; L.warn = null; L.inv = 0; L.redObjs = [];
     const g = new THREE.Group(); const dm = M.dark, eye = new THREE.MeshBasicMaterial({ color: '#c04dff' });
     mesh(dm, -0.8, 1, 0, 0.9, 2, 0.9, g); mesh(dm, 0.8, 1, 0, 0.9, 2, 0.9, g); const body = mesh(dm, 0, 3, 0, 3, 2.4, 1.6, g);
     const head = new THREE.Group(); head.position.set(0, 4.9, 0); g.add(head); mesh(dm, 0, 0, 0, 1.6, 1.4, 1.4, head); mesh(eye, -0.38, 0.1, 0.71, 0.36, 0.24, 0.05, head); mesh(eye, 0.38, 0.1, 0.71, 0.36, 0.24, 0.05, head);
@@ -852,6 +1326,15 @@ const LEVELS = [
     L.golemLight = new THREE.PointLight('#b04dff', 3, 8); L.golemLight.position.set(0, 4, wz(0)); world.add(L.golemLight);
     L.onEmber = () => this.fireball(L);
     show('#hearts', true); this.hearts(L); this.spawnOrb(L);
+  },
+  async start(L) {
+    L.paused = true;
+    await modal(`<h2>How to beat the Golem 👹</h2><div class="howto">
+      <div class="hstep"><div class="hart"><span class="hero">🧍</span><span class="go">➜</span><span class="big">🔥</span></div><b>1. Grab an ember</b><small>Walk into the glowing 🔥</small></div>
+      <div class="hstep"><div class="hart"><span class="big">🔥</span><span class="go arc">➶</span><span class="big">👹</span></div><b>2. It flies at the Golem!</b><small>Hit it 3 times 💥💥💥</small></div>
+      <div class="hstep"><div class="hart"><span class="mini-tile red"></span><span class="go">➜</span><span class="mini-tile"></span></div><b>3. Step OFF red tiles</b><small>Red = the Golem will SMASH there</small></div>
+    </div><p class="small">You have ❤️❤️❤️. If you lose them all, just try again!</p><button class="btn primary huge" id="gGo">Got it - Start! ▶</button>`, (el, done) => el.querySelector('#gGo').onclick = done);
+    L.paused = false; L.fightT = 0; L.atkT = 6; say('Grab the 🔥 ember first! The Golem is slow… for now.', 4000);
   },
   hearts(L) { $('#hearts').textContent = '❤️'.repeat(L.hearts) + '🖤'.repeat(3 - L.hearts) + `  👹 ${'💥'.repeat(L.hits)}${'⬜'.repeat(L.need - L.hits)}`; },
   floorCells() { const a = []; for (const row of grid) for (const c of row) if (c.t === '.') a.push(c); return a; },
@@ -873,8 +1356,8 @@ const LEVELS = [
     const cs = this.floorCells(); const pats = [
       c => c.z % 2 === (L.hits % 2), c => c.x % 2 === 1, c => (c.x + c.z) % 2 === 0,
       c => Math.abs(c.x - player.x) <= 1 && Math.abs(c.z - player.z) <= 1, c => c.z === player.z || c.x === player.x];
-    const f = L.hits === 0 ? pick([pats[3], pats[4], pats[0]]) : pick(pats);
-    L.warn = new Set(cs.filter(f)); L.warnT = L.hits >= 2 ? 1.7 : 2.2;
+    const f = L.fightT < 25 && L.hits === 0 ? pick([pats[3], pats[0]]) : pick(pats);
+    L.warn = new Set(cs.filter(f)); L.warnT = L.warnT0 = Math.max(1.6, 3.4 - 0.45 * L.hits - 0.015 * L.fightT);
     L.warn.forEach(c => { const o = mesh(M.red, wx(c.x), 0.03, wz(c.z), 0.94, 0.04, 0.94); o.castShadow = false; L.redObjs.push(o); });
     Sound.sfx('warn'); say('⚠️ RED tiles! Step off them!', 1800);
   },
@@ -886,16 +1369,16 @@ const LEVELS = [
       if (L.hearts <= 0) { this.clearRed(L); this.lose(L); return; }
       say('Ouch! 💔 Watch for red tiles!', 2000);
     }
-    this.clearRed(L); L.atkT = L.hits >= 2 ? 2.2 : 3.0;
+    this.clearRed(L); L.atkT = Math.max(2.0, 5 - L.hits * 1.0 - L.fightT * 0.02);
   },
   async lose(L) {
     L.locked = true; L.paused = true; failLevel(); player.queue = [];
     await modal(`<h2>💥 The golem got you!</h2><p class="story-text">Heroes never give up! Try again? 💪</p><button class="btn primary">Try again 🔥</button>`, (el, done) => el.querySelector('button').onclick = done);
     for (const row of grid) for (const c of row) if (c.ember) { world.remove(c.obj); c.ember = false; }
-    L.hearts = 3; L.hits = 0; this.hearts(L); placePlayer(L.start[0], L.start[1]); L.atkT = 3.5; L.paused = false; L.locked = false; this.spawnOrb(L);
+    L.hearts = 3; L.hits = 0; L.fightT = 0; this.hearts(L); placePlayer(L.start[0], L.start[1]); L.atkT = 6; L.paused = false; L.locked = false; this.spawnOrb(L);
   },
   async win(L) {
-    L.won = true; L.locked = true; this.clearRed(L); Sound.sfx('boom'); shake(0.6);
+    L.won = true; L.locked = true; this.clearRed(L); scene.background = new THREE.Color('#3d3a63'); Sound.sfx('boom'); shake(0.6);
     const G = L.golem.g; G.traverse(o => { if (o.isMesh) burst(o.getWorldPosition(new THREE.Vector3()), pick(['#3a3550', '#7a2fbf', '#c04dff']), 6, 4); });
     tween(1, k => { G.scale.setScalar(1 - k); G.rotation.z = k * 0.5; }, () => world.remove(G)); L.golemLight.intensity = 0;
     await showBanner('👹💥 Golem defeated!', 1600);
@@ -916,51 +1399,76 @@ const LEVELS = [
   update(L, dt, t) {
     if (L.won || L.paused || L.locked && !L.warn) { return; }
     const G = L.golem; G.head.rotation.y = Math.sin(t / 600) * 0.3; G.g.position.y = Math.sin(t / 400) * 0.05;
-    L.inv -= dt;
-    if (L.warn) { L.warnT -= dt; const k = Math.max(0, L.warnT); G.aL.rotation.x = G.aR.rotation.x = -Math.min(1, (2.2 - k)) * 2.2; L.redObjs.forEach(o => o.material.opacity = 0.35 + Math.abs(Math.sin(t / (k < 0.8 ? 60 : 140))) * 0.45); if (L.warnT <= 0) { G.aL.rotation.x = G.aR.rotation.x = 0; this.slam(L); } }
+    L.inv -= dt; L.fightT += dt;
+    if (L.warn) { L.warnT -= dt; const k = Math.max(0, L.warnT); G.aL.rotation.x = G.aR.rotation.x = -Math.min(1, (L.warnT0 - k) / L.warnT0 * 1.5) * 2.2; L.redObjs.forEach(o => o.material.opacity = 0.35 + Math.abs(Math.sin(t / (k < 0.8 ? 60 : 140))) * 0.45); if (L.warnT <= 0) { G.aL.rotation.x = G.aR.rotation.x = 0; this.slam(L); } }
     else { L.atkT -= dt; if (L.atkT <= 0) this.attack(L); }
   },
 },
 ];
 
 /* ================= SCORING ================= */
-const TOTAL_STARS = 6;
+const TOTAL_STARS = LEVELS.reduce((n, d) => n + d.map.join('').split('').filter(ch => ch === '*' || ch === 'x').length, 0);
+const PUZZLES = ['L2', 'L3', 'L4', 'L5', 'L6', 'L8', 'N1', 'N2', 'N4', 'N5'];
 function computeScores() {
   const lv = S.levels.filter(Boolean); const byId = Object.fromEntries(lv.map(l => [l.id, l]));
-  // Problem-solving (35): puzzle levels, full marks for solving, small deductions per extra try / hint
-  const puzzles = ['L2', 'L3', 'L4', 'L5', 'L6', 'L8'];
-  const ps = puzzles.map(id => { const l = byId[id]; if (!l || !l.completed) return 0; return Math.max(0.4, 1 - 0.1 * l.fails - 0.12 * l.hints); });
-  const problem = 35 * ps.reduce((a, b) => a + b, 0) / puzzles.length;
-  // Persistence (20): finishing levels + coming back after a failure
+  // Problem-solving (35): 10 puzzle islands; full marks for solving, small deductions per extra try / hint
+  const ps = PUZZLES.map(id => { const l = byId[id]; if (!l || !l.completed) return 0; return Math.max(0.4, 1 - 0.1 * l.fails - 0.12 * l.hints); });
+  const problem = 35 * ps.reduce((a, b) => a + b, 0) / PUZZLES.length;
+  // Persistence (20): finishing islands + coming back after a failure
   const done = lv.filter(l => l.completed).length; const failed = lv.filter(l => l.fails > 0); const recovered = failed.filter(l => l.completed).length;
   const persistence = 10 * done / LEVELS.length + 10 * (failed.length ? recovered / failed.length : 1);
-  // Curiosity (15): secret stars + exploring (cracked walls, bushes)
-  const explore = lv.reduce((a, l) => a + l.explore, 0) - S.stars; // bushes + cracks
-  const curiosity = 12 * Math.min(1, S.stars / TOTAL_STARS) + Math.min(3, explore + (S.promoTaps > 0 ? 1 : 0));
-  // Creativity (20): free build
-  const b = S.build || {};
-  const creativity = b.blocks ? (7 * Math.min(1, b.blocks / 25) + 5 * Math.min(1, b.materials / 5) + 4 * Math.min(1, b.height / 5) + 2 * Math.min(1, b.footprint / 10) + (b.name ? 2 : 0)) : 0;
-  // Communication (10): typed lines
-  const sp = S.speech || {}, bo = S.boss || {};
-  const communication = (sp.words ? (sp.pickedIdea ? 2 : (sp.words >= 4 ? 4 : 2)) : 0) + (b.whyWords >= 4 ? 3 : b.whyWords ? 1.5 : 0) + (bo.how ? 1 : 0) + (bo.lineWords >= 3 ? 2 : bo.lineWords ? 1 : 0);
-  const r = v => Math.round(v * 10) / 10;
-  const sc = { problem: r(problem), persistence: r(persistence), curiosity: r(curiosity), creativity: r(creativity), communication: r(communication) };
+  // Curiosity (15): secret stars + exploring
+  const explore = lv.reduce((a, l) => a + l.explore, 0) - S.stars;
+  const curiosity = 12 * Math.min(1, S.stars / (TOTAL_STARS * 0.75)) + Math.min(3, explore + (S.promoTaps > 0 ? 1 : 0));
+  // Creativity (20): build challenge accuracy 8 + speed 2, bonus free build 4, Dream Machine 3, Tale Trail 3
+  const b = S.build || {}, iv = S.invent || {}, tl = S.tale || {};
+  const creativity = 8 * (b.acc || 0) + 2 * (b.timeFrac || 0) + (b.bonus ? 2 * Math.min(1, b.blocks / 15) + Math.min(1, b.materials / 4) : 0) + (b.name ? 1 : 0)
+    + (iv.name ? 1.5 : 0) + (iv.words >= 4 ? 1.5 : iv.words ? 0.75 : 0) + (tl.who ? 1.5 : 0) + (tl.words >= 5 ? 1.5 : tl.words ? 0.75 : 0);
+  // Communication (10): hello line 3, steady voice 2, build reason 1.5, story ending 1.5, invention line 1, boss reflection 1
+  const sp = S.speech || {}, bo = S.boss || {}, vo = S.voice || {};
+  const communication = (sp.words ? (sp.pickedIdea ? 1.5 : (sp.words >= 4 ? 3 : 2)) : 0) + 2 * (vo.ratio || 0) + (b.whyWords >= 4 ? 1.5 : b.whyWords ? 0.75 : 0) + (tl.words >= 5 ? 1.5 : tl.words ? 0.75 : 0) + (iv.words >= 4 ? 1 : iv.words ? 0.5 : 0) + (bo.how ? 0.5 : 0) + (bo.lineWords >= 3 ? 0.5 : bo.lineWords ? 0.25 : 0);
+  const r = v => Math.round(Math.min(v, 1e9) * 10) / 10;
+  const sc = { problem: r(problem), persistence: r(persistence), curiosity: r(Math.min(15, curiosity)), creativity: r(Math.min(20, creativity)), communication: r(Math.min(10, communication)) };
   sc.total = Math.round(sc.problem + sc.persistence + sc.curiosity + sc.creativity + sc.communication);
-  const firstTry = puzzles.filter(id => byId[id] && byId[id].completed && byId[id].firstTry).length;
-  return { sc, firstTry, puzzles: puzzles.length };
+  const firstTry = PUZZLES.filter(id => byId[id] && byId[id].completed && byId[id].firstTry).length;
+  return { sc, firstTry, puzzles: PUZZLES.length };
 }
 function titleFor(total) { return total >= 80 ? 'Legendary Torchbearer' : total >= 65 ? 'Torchbearer' : total >= 50 ? 'Flame Keeper' : 'Brave Spark'; }
-function badgesFor() {
-  const b = []; const lv = S.levels.filter(Boolean);
-  if (S.levels[7] && S.levels[7].completed) b.push('👹 Golem Slayer');
-  if (S.stars >= 4) b.push('⭐ Star Seeker'); else if (S.stars >= 1) b.push('🔍 Explorer');
-  if (lv.some(l => l.fails > 0 && l.completed)) b.push('💪 Never Give Up');
-  if (S.build && S.build.blocks >= 15) b.push('🧱 Master Builder');
-  if (S.speech && S.speech.wrongPicks === 0) b.push('🎤 Star Speaker');
-  if (S.levels[2] && S.levels[2].firstTry) b.push('🤖 AI Whisperer');
-  if (S.levels[4] && S.levels[4].firstTry) b.push('📖 Storyteller');
-  if (S.embers >= 10) b.push('🔥 Ember Collector');
-  return b;
+function islandStars(l) { if (!l || !l.completed) return 0; let s2 = 3; if (l.fails >= 1 || l.hints >= 1) s2--; if (l.fails >= 3 || l.hints >= 2) s2--; return Math.max(1, s2); }
+function badgePool(totalSec) {
+  const lv = S.levels.filter(Boolean); const by = Object.fromEntries(lv.map(l => [l.id, l])); const b = S.build || {};
+  const hints = lv.reduce((a, l) => a + l.hints, 0); const explore = lv.reduce((a, l) => a + l.explore, 0);
+  const pz = PUZZLES.map(id => by[id]).filter(l => l && l.completed); const avgT = pz.length ? pz.reduce((a, l) => a + l.time, 0) / pz.length : 999;
+  const lvl = (id, f) => { const l = by[id]; return l && l.completed ? f(l) : 0; };
+  const sp = S.speech || {}, bo = S.boss || {};
+  const kind = /\b(hello|hi|happy|thank|thanks|friend|friends|welcome|love|glad|please|nice|great)\b/i.test(sp.line || '');
+  return [
+    ['fast', '⚡', 'Fast Thinker', 'Solved puzzles quickly', 30 / avgT],
+    ['never', '💪', 'Never Give Up', 'Kept going after mistakes', lv.filter(l => l.fails > 0 && l.completed).length / 2],
+    ['stars', '⭐', 'Star Seeker', 'Found secret stars', S.stars / Math.max(1, TOTAL_STARS * 0.6)],
+    ['builder', '🧱', 'Perfect Builder', 'Copied the models exactly', (b.acc || 0) / 0.95 + (b.perfect === 3 ? 0.1 : 0)],
+    ['story', '📖', 'Story Master', 'Put every story in order', lvl('L5', l => 1.15 - 0.3 * l.fails - 0.2 * l.hints)],
+    ['golem', '👹', 'Golem Slayer', 'Defeated the Shadow Golem', lvl('L8', l => l.skipped ? 0 : 1 + 0.03 * (bo.heartsLeft || 0))],
+    ['ai', '🤖', 'AI Whisperer', 'Taught and fixed the robots', ['L3', 'N1', 'N5'].reduce((a, id) => a + lvl(id, l => l.fails === 0 && l.hints === 0 ? 1.12 : Math.max(0.3, 0.85 - 0.15 * l.fails)), 0) / 3],
+    ['explorer', '🧭', 'Explorer', 'Peeked into hidden spots', explore / 4],
+    ['planner', '🧠', 'Careful Planner', 'Solved logic with few resets', ['L2', 'L4', 'N4'].filter(id => by[id] && by[id].completed && by[id].fails <= 1).length / 3 * 1.05],
+    ['nohint', '🦸', 'No-Hint Hero', 'Never needed a hint', hints === 0 ? 1.02 : 0.8 / hints],
+    ['comeback', '🔄', 'Comeback Kid', 'Won after 2+ tries', Math.max(0, ...lv.filter(l => l.completed && !l.skipped).map(l => l.fails)) / 2],
+    ['speed', '🏃', 'Speed Runner', 'Finished the quest fast', 780 / Math.max(1, totalSec)],
+    ['kind', '💬', 'Kind Speaker', 'Greeted the crowd warmly', sp.words ? (kind && sp.words >= 4 ? 1.08 : sp.words >= 4 ? 0.85 : 0.5) : 0],
+    ['voice', '🎙️', 'Steady Voice', 'Spoke right on the beat', (S.voice ? S.voice.ratio : 0) / 0.85],
+    ['ember', '🔥', 'Ember Collector', 'Gathered lots of embers', S.embers / 12],
+    ['inventor', '💡', 'Inventor', 'Dreamed up a new machine', S.invent ? (S.invent.words >= 4 ? 1.06 : 0.75) : 0],
+    ['artist', '🎨', 'Free Builder', 'Made a bonus creation', b.bonus ? b.blocks / 12 : 0],
+    ['untouch', '🛡️', 'Untouchable', 'Beat the Golem with all hearts', lvl('L8', () => (bo.heartsLeft || 0) / 3 * 1.1)],
+    ['firsttry', '🎯', 'First-Try Champ', 'Solved puzzles on the first try', PUZZLES.filter(id => by[id] && by[id].completed && by[id].firstTry).length / (PUZZLES.length * 0.7)],
+    ['tale', '🗺️', 'Tale Weaver', 'Wrote a great story ending', S.tale ? S.tale.words / 7 : 0],
+  ].map(([id, e, n, d, v]) => ({ id, e, n, d, v: Math.round(Math.max(0, v || 0) * 100) / 100 }));
+}
+function topBadges(totalSec) {
+  const pool = badgePool(totalSec); const key = x => Math.min(x.v, 1.5) + (['builder', 'untouch', 'voice', 'story', 'nohint'].includes(x.id) ? 0.12 : 0);
+  const earned = pool.filter(x => x.v >= 1).sort((a, b) => key(b) - key(a)); const rest = pool.filter(x => x.v < 1).sort((a, b) => b.v - a.v);
+  return earned.slice(0, 5).map(x => ({ ...x, earned: true })).concat(rest.slice(0, Math.max(0, 5 - earned.length)).map(x => ({ ...x, earned: false })));
 }
 
 /* ================= SAVING ================= */
@@ -973,10 +1481,13 @@ async function submitRecord(rec) {
     _subject: `${rec.test ? 'TEST - ' : ''}Promethia Quest: ${rec.name} (G${rec.grade}${rec.section}) ${rec.scores.total}/100 ${rec.title}`,
     _template: 'table', _captcha: 'false',
     attempt_id: rec.id, student: rec.name, grade: rec.grade, section: rec.section, lab_pc: rec.pc, test: rec.test ? 'YES' : 'no',
-    total_score: rec.scores.total, title: rec.title, problem_solving_35: rec.scores.problem, persistence_20: rec.scores.persistence, curiosity_15: rec.scores.curiosity, creativity_20: rec.scores.creativity, communication_10: rec.scores.communication,
-    total_minutes: (rec.totalSec / 60).toFixed(1), first_try_puzzles: `${rec.firstTry}/${rec.puzzles}`, stars: `${rec.stars}/${TOTAL_STARS}`, embers: rec.embers, hero: rec.hero, badges: rec.badges.join(', '),
+    total_score: rec.scores.total, title: rec.title, badges_top5: rec.badges.join(', '), problem_solving_35: rec.scores.problem, persistence_20: rec.scores.persistence, curiosity_15: rec.scores.curiosity, creativity_20: rec.scores.creativity, communication_10: rec.scores.communication,
+    total_minutes: (rec.totalSec / 60).toFixed(1), first_try_puzzles: `${rec.firstTry}/${rec.puzzles}`, stars: `${rec.stars}/${TOTAL_STARS}`, embers: rec.embers, hero: rec.hero, island_stars: rec.islandStars.join(''),
     ...Object.fromEntries(LEVELS.map((d, i) => [`L${i + 1}_${d.name.replace(/[^A-Za-z]/g, '')}`, levelLine(rec.levels[i])])),
-    build: rec.build ? `${rec.build.blocks} blocks, ${rec.build.materials} materials, height ${rec.build.height}, type ${rec.build.type}, name "${rec.build.name}"` : '',
+    build_challenge: rec.build && rec.build.rounds ? rec.build.rounds.map(r => `${r.name} ${r.acc}% ${r.sec}s`).join('; ') + ` (avg ${Math.round(rec.build.acc * 100)}%)` : '',
+    build: rec.build ? `${rec.build.bonus ? `bonus ${rec.build.blocks} blocks, ${rec.build.materials} materials, height ${rec.build.height}` : 'no bonus build'}, type ${rec.build.type}, name "${rec.build.name}"` : '',
+    voice_on_beat: rec.voice ? `${rec.voice.good} on-beat, ${rec.voice.miss} off-beat` : '', tale: rec.tale ? `${rec.tale.who} / ${rec.tale.where} / ${rec.tale.problem} / ending: ${rec.tale.ending}` : '',
+    invention: rec.invent ? `${rec.invent.parts.join(' + ')} = "${rec.invent.name}": ${rec.invent.does}` : '',
     build_why: rec.build ? rec.build.why : '', speech_line: rec.speech ? rec.speech.line : '', speech_wrong_picks: rec.speech ? rec.speech.wrongPicks : '',
     boss_how: rec.boss ? rec.boss.how : '', boss_line: rec.boss ? rec.boss.line : '', finished_at: rec.finishedAt, device: `${innerWidth}x${innerHeight}`,
   };
@@ -1001,14 +1512,19 @@ async function finishGame() {
     id: 'PQ-' + Date.now().toString(36).toUpperCase(), test: TEST, name: S.student.name, grade: S.student.grade, section: S.student.section, pc: S.student.pc, hero: S.hero.name,
     startedAt: S.startedAt, finishedAt: new Date().toISOString(), totalSec: Math.round((Date.now() - new Date(S.startedAt).getTime()) / 1000),
     levels: S.levels.map(l => l && ({ id: l.id, name: l.name, skill: l.skill, time: l.time, attempts: l.attempts, fails: l.fails, hints: l.hints, stars: l.stars, explore: l.explore, embers: l.embers, completed: l.completed, skipped: l.skipped, firstTry: l.firstTry })),
-    build: S.build, speech: S.speech, boss: S.boss, stars: S.stars, embers: S.embers, scores: sc, firstTry, puzzles, title, badges: badgesFor(), sent: false,
+    build: S.build, speech: S.speech, boss: S.boss, voice: S.voice, tale: S.tale, invent: S.invent, stars: S.stars, embers: S.embers, scores: sc, firstTry, puzzles, title, sent: false,
   };
+  const top = topBadges(rec.totalSec); rec.badges = top.map(x => `${x.e} ${x.n}`); rec.badgeIds = top.map(x => x.id); rec.islandStars = LEVELS.map((d, i) => islandStars(S.levels[i]));
   const a = getArchive(); a.push(rec); setArchive(a);
   // results screen
-  $('#badgeTitle').textContent = title; $('#resName').textContent = `${rec.name}, you are a`;
+  $('#badgeTitle').textContent = title; $('#resName').textContent = `${rec.name}, you are a`; window.__pqRec = rec;
   $('#resLine').textContent = `🏆 ${title}! 🏆`;
-  $('#resBadges').innerHTML = rec.badges.map(b => `<span>${b}</span>`).join('');
-  $('#resStats').innerHTML = `<div>⭐ ${rec.stars}/${TOTAL_STARS}<small>secret stars</small></div><div>🔥 ${rec.embers}<small>embers</small></div><div>⏱️ ${Math.round(rec.totalSec / 60)}m<small>time</small></div>`;
+  $('#resBadges').innerHTML = top.map((x, i) => `<div class="b5" style="animation-delay:${0.3 + i * 0.15}s"><span class="be">${x.e}</span><b>${x.n}</b><small>${x.d}</small></div>`).join('');
+  const mm = Math.floor(rec.totalSec / 60), ss = rec.totalSec % 60;
+  $('#resStats').innerHTML = `<div>🏆 ${sc.total}<small>score /100</small></div><div>⏱️ ${mm}:${String(ss).padStart(2, '0')}<small>time</small></div><div>⭐ ${rec.stars}/${TOTAL_STARS}<small>secret stars</small></div><div>🔥 ${rec.embers}<small>embers</small></div>`;
+  const bars = [['🧩 Problem-solving', sc.problem, 35], ['💪 Persistence', sc.persistence, 20], ['🔍 Curiosity', sc.curiosity, 15], ['🎨 Creativity', sc.creativity, 20], ['🗣️ Communication', sc.communication, 10]];
+  $('#resBars').innerHTML = bars.map(([n, v, m], i) => `<div class="bar"><span class="bn">${n}</span><span class="bt"><i style="--w:${Math.round(100 * v / m)}%;animation-delay:${0.2 + i * 0.12}s"></i></span><span class="bv">${v}/${m}</span></div>`).join('');
+  $('#resIslands').innerHTML = LEVELS.map((d, i) => `<div class="isl1" title="${d.name}"><span>${d.emoji}</span><small>${i + 1}</small><b>${'★'.repeat(rec.islandStars[i])}<em>${'★'.repeat(3 - rec.islandStars[i])}</em></b></div>`).join('');
   show('#results'); Sound.sfx('win');
   $('#saveStatus').className = 'save'; $('#saveStatus').textContent = 'Saving… ⏳';
   let ok = false;
@@ -1041,16 +1557,31 @@ function pickHero() {
   show('#heroPick'); const box = $('#heroes');
   box.innerHTML = HEROES.map(h => `<button class="choice" data-id="${h.id}"><div class="sw" style="background:linear-gradient(${h.hair} 0 25%,${h.skin} 25% 50%,${h.shirt} 50% 80%,${h.pants} 80%)"></div>${h.name}</button>`).join('');
   box.querySelectorAll('.choice').forEach(b => b.onclick = () => { box.querySelectorAll('.choice').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); S.hero = HEROES.find(h => h.id === b.dataset.id); $('#heroGo').disabled = false; Sound.sfx('click'); });
-  $('#heroGo').onclick = () => { show('#heroPick', false); buildPlayer(S.hero); S.startedAt = new Date().toISOString(); startLevel(DEBUG && QS.get('level') ? Math.max(0, Math.min(LEVELS.length - 1, (+QS.get('level')) - 1)) : 0); };
+  $('#heroGo').onclick = async () => { show('#heroPick', false); buildPlayer(S.hero); S.startedAt = new Date().toISOString();
+    if (DEBUG && QS.get('level')) return startLevel(Math.max(0, Math.min(LEVELS.length - 1, (+QS.get('level')) - 1)));
+    await earthZoom(); await showMap(-1, 0, true); startLevel(0); };
 }
 
 /* ================= BOOT ================= */
-// title-screen backdrop
+// title: cinematic intro over space
 buildDecor();
 L = null; buildLevel({ map: ['.........', '.........', '.........', '.........', '.........'] }); GW = 9; GH = 5; fitCamera();
 buildPlayer(HEROES[0]); placePlayer(4, 2); player.face = 0;
+setMode('space');
 applyQuality(); requestAnimationFrame(loop);
+(function intro() {
+  const cv = $('#introFx'), g = cv.getContext('2d'); let W, H; const fit = () => { W = cv.width = innerWidth; H = cv.height = innerHeight; }; fit(); addEventListener('resize', fit);
+  const N = quality === 'high' ? 160 : 60; const P = Array.from({ length: N }, () => ({ x: Math.random(), y: 1 + Math.random() * 0.5, v: rnd(0.05, 0.22), s: rnd(1, 3.5), c: pick(['#f26b21', '#ffd23f', '#ffb27f', '#ffffff']) }));
+  let alive = true, t0 = performance.now();
+  const tick = t => { if (!alive) return; requestAnimationFrame(tick); const dt = 1 / 60; g.clearRect(0, 0, W, H);
+    for (const p of P) { p.y -= p.v * dt; p.x += Math.sin(t / 700 + p.s) * 0.0004; if (p.y < -0.05) { p.y = 1.05; p.x = Math.random(); } g.globalAlpha = Math.min(1, (t - t0) / 800) * (0.4 + 0.6 * Math.abs(Math.sin(t / 300 + p.s))); g.fillStyle = p.c; g.fillRect(p.x * W, p.y * H, p.s, p.s); }
+    g.globalAlpha = 1; };
+  requestAnimationFrame(tick);
+  SC.pos.set(0, 2, 60); tween(4.5, k => SC.pos.z = 60 - 24 * (1 - Math.pow(1 - k, 3)));
+  const end = () => { if (!alive) return; alive = false; const l0 = SC.look.clone(), port = camera.aspect < 0.8; tween(1.2, k => SC.look.lerpVectors(l0, port ? new THREE.Vector3(0, 13, 0) : new THREE.Vector3(15, 0, 0), ease(k))); $('#intro').classList.add('out'); setTimeout(() => { show('#intro', false); }, 700); show('#start'); };
+  $('#introSkip').onclick = () => { Sound.init(); end(); }; setTimeout(end, TEST ? 1800 : 5200);
+})();
 retryUnsent();
 if (DEBUG) {
-  window.PQ = { S, LEVELS, get L() { return L; }, win: () => completeLevel(), start: i => startLevel(i), cell, player, tryStep, get grid() { return grid; }, computeScores, findPath, go: (x, z) => { const p = findPath(x, z); if (p) player.queue = p; return !!p; } };
+  window.PQ = { S, topBadges, badgePool, islandStars, get MODE() { return MODE; }, LEVELS, get L() { return L; }, win: () => completeLevel(), start: i => startLevel(i), cell, player, tryStep, get grid() { return grid; }, computeScores, findPath, go: (x, z) => { const p = findPath(x, z); if (p) player.queue = p; return !!p; } };
 }

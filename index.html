@@ -45,13 +45,31 @@
 </div>
 
 <div id="buildBar" class="hidden"></div>
+<div id="panel" class="hidden"></div>
+
+<!-- Cinematic intro -->
+<div id="intro">
+  <canvas id="introFx"></canvas>
+  <div class="intro-title">
+    <img src="assets/logo-mark.png" alt="" class="it-logo">
+    <div class="it-small">welcome to</div>
+    <h1 class="it-name"><span class="w1">Promethia</span> <span class="w2">Elevate</span> <span class="w3">Labs</span></h1>
+    <div class="it-line"></div>
+    <div class="it-sub">presents · Promethia Quest</div>
+  </div>
+  <button id="introSkip" class="act ghost">Skip ▶</button>
+</div>
+<div id="zoomTxt" class="hidden">🌍 Flying to the Promethia Islands…</div>
+
+<!-- Island map -->
+<div id="mapUI" class="hidden"><div class="map-card"><div id="mapTitle"></div><div id="mapSub" class="small"></div><div id="mapDots"></div><button id="mapGo" class="btn primary">Play ▶</button></div></div>
 
 <!-- Start screen -->
-<div id="start" class="screen">
+<div id="start" class="screen hidden">
   <div class="card">
     <img src="assets/promo.webp" class="promo-big" alt="Promo">
     <h1>Promethia <span>Quest</span></h1>
-    <p class="tag">Relight the Great Torch!</p>
+    <p class="tag">Relight the Great Torch! · 14 islands</p>
     <form id="startForm" autocomplete="off">
       <label>Your name<input id="fName" required maxlength="40" placeholder="First and last name"></label>
       <div class="row">
@@ -59,9 +77,9 @@
         <label>Section<input id="fSection" maxlength="6" placeholder="A"></label>
         <label>Lab PC #<input id="fPC" maxlength="8" placeholder="12"></label>
       </div>
-      <button class="btn primary" type="submit">Start the adventure ▶</button>
+      <button class="btn primary" type="submit">Play ▶</button>
     </form>
-    <p class="small">🎮 Arrow keys / W A S D or tap · About 15 minutes</p>
+    <p class="small">🎮 Arrow keys / W A S D or tap · About 20 minutes</p>
   </div>
 </div>
 
@@ -92,11 +110,11 @@
 <!-- Results -->
 <div id="results" class="screen hidden">
   <div class="card results">
-    <div class="badge-wrap"><div class="badge" id="badge"><img src="assets/logo-mark.png" alt=""><div id="badgeTitle">Torchbearer</div></div></div>
-    <h2 id="resName"></h2>
-    <p id="resLine" class="tag"></p>
-    <div id="resBadges" class="badges"></div>
-    <div id="resStats" class="stats"></div>
+    <div class="res-top"><div class="badge" id="badge"><img src="assets/logo-mark.png" alt=""><div id="badgeTitle">Torchbearer</div></div>
+      <div class="res-head"><h2 id="resName"></h2><p id="resLine" class="tag"></p><div id="resStats" class="stats"></div></div></div>
+    <h3>🏅 My 5 badges</h3><div id="resBadges" class="badges5"></div>
+    <h3>📊 My skills</h3><div id="resBars" class="bars"></div>
+    <h3>🏝️ My islands</h3><div id="resIslands" class="isl"></div>
     <div id="saveStatus" class="save">Saving…</div>
     <button id="btnNext" class="btn primary huge hidden">Next student →</button>
   </div>
