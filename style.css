@@ -260,3 +260,4 @@ body[data-level=S1] .sstrip .bank{font-size:20px}
 .avfig.girl .f{box-shadow:inset 0 7px 0 #2a1a0e,inset 3px 0 0 #2a1a0e,inset -3px 0 0 #2a1a0e}
 .avfig.girl .l{background:linear-gradient(#1a2a4f 45%,transparent 45%),linear-gradient(90deg,#c98f65 30%,transparent 30% 70%,#c98f65 70%)}
 #resAv{margin-right:8px;transform:scale(1.1)}
+body[data-level=S1] .sstrip{width:100%}body[data-level=S1] .sstrip .sc{flex:1 1 0;min-width:0;width:auto}body[data-level=S1] .sstrip .sp{flex:0 0 12px;width:12px}

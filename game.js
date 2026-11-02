@@ -1878,7 +1878,7 @@ async function grandFinale() {
   const fire = new THREE.Group(); fire.position.y = 4.5; g.add(fire); fire.scale.setScalar(0.01);
   [['#ff4f1a', 1.5, 0.9], ['#ff8a1a', 1.1, 1.6], ['#ffd23f', 0.7, 2.2], ['#fff3b0', 0.35, 2.6]].forEach(([c, w, h]) => { const f = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: c })); f.scale.set(w, h, w); f.position.y = h / 2; f.rotation.y = w; fire.add(f); });
   const light = new THREE.PointLight('#ffb35a', 0, 80); light.position.set(0, 7, 0); g.add(light);
-  MC.follow = false; MC.target.copy(P).add(new THREE.Vector3(0, 4.5, 0)); const d0 = MC.dist; MC.dist = camera.aspect < 0.8 ? 13 : 11;
+  MC.follow = false; MC.target.copy(P).add(new THREE.Vector3(0, camera.aspect < 0.8 ? 6 : 5, 0)); const d0 = MC.dist; MC.dist = camera.aspect < 0.8 ? 17 : 12;
   camera.position.copy(P).add(new THREE.Vector3(0, 30, 24)); MC.look.copy(MC.target); // fly in from above
   const ov = document.createElement('div'); ov.id = 'finale'; ov.innerHTML = '<div class="fin-t">THE GREAT TORCH IS LIT! 🔥</div><div class="fin-s">You brought the light back to every island of Promethia ✨</div><div class="fin-tap">tap to continue</div>'; document.body.appendChild(ov);
   let skip; const skipP = new Promise(r => skip = r); ov.onclick = () => skip();
