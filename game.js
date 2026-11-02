@@ -305,6 +305,8 @@ const HEROES = [
   { id: 'jade', name: 'Jade', shirt: '#2fa86b', pants: '#5a3a20', hair: '#111111', skin: '#f1c9a5' },
   { id: 'ruby', name: 'Ruby', shirt: '#d63b5a', pants: '#3a2a5a', hair: '#7a3a10', skin: '#8d5a3b' },
 ];
+// the two avatars chosen on the form (Promethia orange / navy outfits)
+const AVATARS = { boy: { id: 'boy', name: 'Boy', shirt: '#f26b21', pants: '#1a2a4f', hair: '#2a1a0e', skin: '#c98f65' }, girl: { id: 'girl', name: 'Girl', shirt: '#f26b21', pants: '#1a2a4f', hair: '#2a1a0e', skin: '#c98f65', girl: true } };
 const player = { g: new THREE.Group(), x: 0, z: 0, moving: false, queue: [], face: 0, parts: {}, hero: HEROES[0], walkT: 0, jumpT: 0 };
 function buildPlayer(h) {
   const P = player.g; P.clear(); player.hero = h;
@@ -321,6 +323,7 @@ function buildPlayer(h) {
   add(m('#ffffff'), -0.09, 0.02, 0.201, 0.1, 0.08, 0.01, head); add(m('#ffffff'), 0.09, 0.02, 0.201, 0.1, 0.08, 0.01, head);
   add(m('#1a2a4f'), -0.08, 0.02, 0.206, 0.05, 0.07, 0.01, head); add(m('#1a2a4f'), 0.1, 0.02, 0.206, 0.05, 0.07, 0.01, head);
   add(m('#a5410c'), 0, -0.1, 0.201, 0.12, 0.03, 0.01, head);
+  if (h.girl) { add(m(h.hair), 0, -0.12, -0.2, 0.42, 0.36, 0.08, head); add(m(h.hair), -0.205, -0.05, 0, 0.04, 0.3, 0.38, head); add(m(h.hair), 0.205, -0.05, 0, 0.04, 0.3, 0.38, head); const pt = add(m(h.hair), 0, -0.05, -0.32, 0.14, 0.38, 0.12, head); pt.rotation.x = 0.3; add(m('#f26b21'), 0, 0.16, -0.27, 0.16, 0.06, 0.06, head); add(m('#1a2a4f'), 0, 0.38, 0, 0.5, 0.12, 0.26); }
   player.parts = { legL, legR, armL, armR, head };
   scene.add(P);
 }
@@ -634,9 +637,9 @@ function checkHelpers() {
   if (!L || L.done) return; const t = now() - L.rec.t0, f = L.rec.fails;
   if (getHints().length && (t > (CFG.HINT_AFTER_SEC || 45) || f >= (CFG.HINT_AFTER_FAILS || 2))) show('#btnHint', true);
   const hard = S.idx >= LEVELS.length - 3, tut = S.idx === 0;
-  if ((!L.def.noSkip || (!tut && !L.def.ownTimer)) && (t > (CFG.SKIP_AFTER_SEC || (hard ? 120 : 75)) || f >= (CFG.SKIP_AFTER_FAILS || 3))) show('#btnSkip', true);
+  if ((!L.def.noSkip || (!tut && !L.def.ownTimer)) && ((!L.def.skipFails && t > (CFG.SKIP_AFTER_SEC || (hard ? 120 : 75))) || f >= (CFG.SKIP_AFTER_FAILS || 3))) show('#btnSkip', true);
   // time budget: after a long time, Promo offers to move on (once per level)
-  if (!tut && !L.def.ownTimer && !L.offered && !L.locked && !(TEST && !QS.get('offer')) && t > (hard ? 180 : 120)) { L.offered = true; L.rec.extra.offeredSkip = 1; skipLevel(true); }
+  if (!tut && !L.def.ownTimer && !L.def.skipFails && !L.offered && !L.locked && !(TEST && !QS.get('offer')) && t > (hard ? 180 : 120)) { L.offered = true; L.rec.extra.offeredSkip = 1; skipLevel(true); }
   const tt = $('#totalTime'); if (tt && S.startedAt) { const sec = Math.round((Date.now() - new Date(S.startedAt).getTime()) / 1000); tt.textContent = `⏱️ ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
 }
 
@@ -1161,7 +1164,9 @@ NEW.S1 = {
   hints: L => [`The ${L.R ? L.R.who : 'truck'} weighs ${L.R ? L.R.load : ''} t. Pick a material that holds at least that much 💪`, 'Each material can only reach so far between supports (max span). Add a pillar ┃ to split a long span.', 'Cheaper is better, but it must not break! Check the budget 💰', L.R && L.R.block.length ? 'The strong current 🌊 blocks a pillar at that spot. Put pillars somewhere else.' : 'Rope is cheap but weak. Steel is strong but costly.'],
   setup(L) {
     L.round = 0; L.wins = 0; L.saved = []; L.grp = new THREE.Group(); world.add(L.grp); L.mat = 'wood';
-    const w = new THREE.Mesh(BOX, M.water); w.scale.set(10, 0.1, 3); w.position.set((wx(2) + wx(11)) / 2, -0.45, wz(2)); world.add(w);
+    const w = new THREE.Mesh(BOX, M.water); w.scale.set(10, 0.1, 3); w.position.set((wx(2) + wx(11)) / 2, -0.82, wz(2)); world.add(w);
+    for (let i = 0; i < 9; i++) { const r = mesh('stone', wx(2.2 + Math.random() * 9), -0.9, wz(1) + Math.random() * 2.2, 0.3 + Math.random() * 0.3, 0.2, 0.3); r.rotation.y = i; }
+    L.metal = new THREE.MeshStandardMaterial({ color: '#9aa6b5', metalness: 0.75, roughness: 0.35 }); L.rope = new THREE.MeshLambertMaterial({ color: '#8a6a3a' });
     [[0.3, 0.5], [1.2, 3.6], [12.6, 0.4], [13.4, 3.4], [1.6, 0.2], [12.3, 3.8]].forEach(([x, z]) => { const r = mesh('stone', wx(0) + x, 0.12, wz(0) + z, 0.5, 0.28, 0.4); r.rotation.y = x; });
     const t = new THREE.Group(); L.truckBody = mesh(new THREE.MeshLambertMaterial({ color: '#f26b21' }), 0, 0.55, 0, 1.3, 0.5, 0.7, t); mesh(new THREE.MeshLambertMaterial({ color: '#1a2a4f' }), 0.8, 0.55, 0, 0.45, 0.6, 0.7, t); mesh(new THREE.MeshBasicMaterial({ color: '#9be3ff' }), 1.03, 0.68, 0, 0.02, 0.22, 0.5, t);
     [[-0.4, 0.38], [0.4, 0.38], [-0.4, -0.38], [0.4, -0.38], [0.8, 0.38], [0.8, -0.38]].forEach(([x, z]) => mesh(M.dark, x, 0.18, z, 0.3, 0.3, 0.1, t));
@@ -1184,20 +1189,31 @@ NEW.S1 = {
   spans(L) { const sup = [0, ...[...L.pil].sort((a, b) => a - b), L.R.gap]; const out = []; for (let i = 0; i + 1 < sup.length; i++) out.push([sup[i], sup[i + 1]]); return out; },
   // stress of each metre: max(load / strength, span length / max span) -> green < 0.75, yellow <= 1, red > 1 (breaks)
   stress(L) { const st = Array(L.R.gap).fill(0); this.spans(L).forEach(([a, b]) => { for (let i = a; i < b; i++) { const m = L.deck[i]; if (!m) { st[i] = 9; continue; } const M2 = this.mats[m]; st[i] = Math.max(L.R.load / M2.t, (b - a) / M2.span); } }); return st; },
+  // a real-looking bridge: textured deck at road level, stone pillars from the riverbed, rails / girders / sagging ropes
   draw(L) {
-    Object.values(L.objs).forEach(o => L.grp.remove(o)); L.objs = {}; const G = L.R.gap;
-    for (let i = 0; i < G; i++) { const m = L.deck[i]; const x = wx(2) + i; let o;
-      if (m) { o = mesh(m === 'wood' ? 'plank' : new THREE.MeshLambertMaterial({ color: this.mats[m].col, emissive: '#000000' }), x, -0.02, wz(2), 0.98, m === 'rope' ? 0.08 : 0.16, 1.3, L.grp); if (m === 'steel') { mesh(M.dark, x, 0.25, wz(2) - 0.62, 1, 0.08, 0.06, L.grp); } if (m === 'rope') { [-0.62, 0.62].forEach(dz => { const r = mesh(new THREE.MeshLambertMaterial({ color: '#8a6a3a' }), x, 0.35, wz(2) + dz, 1, 0.04, 0.04, L.grp); }); } }
-      else o = mesh(new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.18, depthWrite: false }), x, -0.02, wz(2), 0.94, 0.1, 1.3, L.grp);
-      o.userData.deck = i; L.objs['d' + i] = o; }
-    for (let b = 1; b < G; b++) { const x = wx(2) - 0.5 + b; const on = L.pil.has(b); const o = on ? mesh('stone', x, -0.6, wz(2), 0.34, 1.1, 0.5, L.grp) : mesh(new THREE.MeshBasicMaterial({ color: L.R.block.includes(b) ? '#ff4040' : '#ffd23f', transparent: true, opacity: 0.35, depthWrite: false }), x, -0.3, wz(2) + 0.9, 0.22, 0.5, 0.22, L.grp); o.userData.pil = b; L.objs['p' + b] = o; }
+    Object.values(L.objs).forEach(o => L.grp.remove(o)); L.objs = {}; const G = L.R.gap, Z = wz(2);
+    const ab = (x) => { const g = new THREE.Group(); mesh('stone', 0, -0.25, 0, 0.5, 0.5, 1.7, g); g.position.set(x, 0, Z); L.grp.add(g); return g; };
+    L.objs.abL = ab(wx(2) - 0.75); L.objs.abR = ab(wx(2) + G - 0.25);
+    const sup = [0, ...[...L.pil].sort((a, b) => a - b), G];
+    for (let i = 0; i < G; i++) { const m = L.deck[i]; const x = wx(2) + i; const g = new THREE.Group(); g.position.set(x, 0, Z);
+      if (m === 'wood') { const pm = M.plank.clone(); pm.emissive = new THREE.Color('#000'); for (let k = 0; k < 4; k++) mesh(pm, -0.375 + k * 0.25, 0, 0, 0.23, 0.12, 1.3, g); const lm = new THREE.MeshLambertMaterial({ color: '#7a5230' }); [-0.62, 0.62].forEach(dz => { mesh(lm, 0, 0.3, dz, 1, 0.07, 0.07, g); mesh(lm, -0.45, 0.16, dz, 0.07, 0.3, 0.07, g); }); }
+      else if (m === 'steel') { const sm = L.metal.clone(); sm.emissive = new THREE.Color('#000'); mesh(sm, 0, 0, 0, 1, 0.1, 1.3, g); [-0.66, 0.66].forEach(dz => { mesh(sm, 0, 0.12, dz, 1, 0.34, 0.08, g); mesh(sm, 0, -0.08, dz * 0.92, 1, 0.06, 0.2, g); for (let r = 0; r < 4; r++) mesh(M.dark, -0.375 + r * 0.25, 0.2, dz + Math.sign(dz) * 0.045, 0.05, 0.05, 0.02, g); }); }
+      else if (m === 'rope') { const span = sup.find((v, j) => j + 1 < sup.length && i >= v && i < sup[j + 1]); const nxt = sup[sup.indexOf(span) + 1]; const len = nxt - span; const sag = q => -0.25 * Math.sin(Math.PI * (q - span) / len);
+        g.position.y = sag(i + 0.5); const rm = new THREE.MeshLambertMaterial({ color: '#c9a66b', emissive: '#000' }); for (let k = 0; k < 3; k++) mesh(rm, -0.33 + k * 0.33, 0, 0, 0.18, 0.06, 1.1, g);
+        [-0.6, 0.6].forEach(dz => { const y0 = sag(i) - g.position.y + 0.5, y1 = sag(i + 1) - g.position.y + 0.5; const r = mesh(L.rope, 0, (y0 + y1) / 2, dz, 1.02, 0.05, 0.05, g); r.rotation.z = Math.atan2(y1 - y0, 1); mesh(L.rope, 0, (y0 + y1) / 4, dz, 0.03, (y0 + y1) / 2, 0.03, g); }); }
+      else { const gm = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, depthWrite: false }); mesh(gm, 0, 0, 0, 0.92, 0.05, 1.25, g); const t = sprite('➕', 0.4); t.position.y = 0.3; g.add(t); }
+      g.userData.deck = i; g.userData.y0 = g.position.y; g.traverse(o => { o.userData.deck = i; }); L.grp.add(g); L.objs['d' + i] = g; }
+    for (let b = 1; b < G; b++) { const x = wx(2) - 0.5 + b; const on = L.pil.has(b), blk = L.R.block.includes(b); const g = new THREE.Group(); g.position.set(x, 0, Z);
+      if (on) { mesh('stone', 0, -0.55, 0, 0.42, 0.95, 0.9, g); mesh('stone', 0, -0.08, 0, 0.56, 0.12, 1.05, g); mesh('stone', 0, -0.98, 0, 0.6, 0.12, 1.1, g); }
+      else { const gm = new THREE.MeshBasicMaterial({ color: blk ? '#ff4040' : '#ffd23f', transparent: true, opacity: blk ? 0.25 : 0.38, depthWrite: false }); mesh(gm, 0, -0.5, 0.75, 0.3, 0.9, 0.12, g); const t = sprite(blk ? '🌊' : '┃', 0.45); t.position.set(0, 0.35, 0.8); g.add(t); }
+      g.traverse(o => { o.userData.pil = b; }); L.grp.add(g); L.objs['p' + b] = g; }
   },
   render(L) {
     const R = L.R, c = this.cost(L), over = c > R.budget;
     const strip = Array.from({ length: R.gap }, (_, i) => `<button class="sc" data-i="${i}" style="background:${L.deck[i] ? this.mats[L.deck[i]].col : '#ffffff55'}">${L.deck[i] ? this.mats[L.deck[i]].e : ''}</button>${i < R.gap - 1 ? `<button class="sp ${L.pil.has(i + 1) ? 'on' : ''} ${R.block.includes(i + 1) ? 'blk' : ''}" data-p="${i + 1}" title="pillar">${R.block.includes(i + 1) ? '🌊' : '┃'}</button>` : ''}`).join('');
     panel(`<div class="bpanel"><b>🌉 ${L.round + 1}/${this.rounds.length}</b><span>${R.who} <b>${R.load} t</b></span><span>River <b>${R.gap} m</b></span><span class="${over ? 'bad' : ''}">💰 ₹${c} / ₹${R.budget}</span></div>
-      <div class="smats">${Object.entries(this.mats).map(([k, m]) => `<button class="sm ${L.mat === k ? 'sel' : ''}" data-m="${k}"><span>${m.e} ${m.n}</span><small>holds ${m.t} t · span ${m.span} m · ₹${m.cost}/m</small></button>`).join('')}<button class="sm" data-fill="1"><span>⬛ Fill all</span><small>with ${this.mats[L.mat].n}</small></button></div>
-      <div class="sstrip"><span class="bank">⛰️</span>${strip}<span class="bank">⛰️</span></div><div class="small2">Tap a metre to lay ${this.mats[L.mat].n}. Tap ┃ to add a pillar (₹${this.pillarCost}).</div>
+      <div class="smats">${Object.entries(this.mats).map(([k, m]) => `<button class="sm ${L.mat === k ? 'sel' : ''}" data-m="${k}"><b class="si">${m.e}</b><span>${m.n}</span><small>💪 ${m.t} t</small><small>↔️ ${m.span} m</small><small>₹${m.cost}/m</small></button>`).join('')}<button class="sm fill" data-fill="1"><b class="si">🧱</b><span>Fill all</span><small>with ${this.mats[L.mat].n}</small></button></div>
+      <div class="sstrip"><span class="bank">⛰️</span>${strip}<span class="bank">⛰️</span></div><div class="small2">Tap a box to lay ${this.mats[L.mat].n} · tap ┃ for a pillar (₹${this.pillarCost})</div>
       <div class="planks"><button class="pk undo2" data-clr="1">🧹 Clear</button><button class="pk go" data-g="1">🚚 Test drive!</button></div>`);
     const P = $('#panel');
     P.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { L.mat = b.dataset.m; Sound.sfx('click'); this.render(L); });
@@ -1209,7 +1225,7 @@ NEW.S1 = {
   },
   setCell(L, i, m) { if (L.ended || L.locked) return; m = m || L.mat; L.deck[i] = L.deck[i] === m ? null : m; Sound.sfx('place'); this.draw(L); const o = L.objs['d' + i]; if (o) { const y0 = o.position.y; o.position.y = 0.8; tween(0.2, k => o.position.y = 0.8 + (y0 - 0.8) * k); } this.render(L); },
   togglePillar(L, b) { if (L.ended || L.locked) return; if (L.R.block.includes(b)) { Sound.sfx('bump'); say('The current is too strong there 🌊 Put the pillar somewhere else.', 2500); return; } if (L.pil.has(b)) L.pil.delete(b); else L.pil.add(b); Sound.sfx('push'); this.draw(L); this.render(L); },
-  onPointer(L, ray) { const hit = ray.intersectObjects(Object.values(L.objs || {}), false)[0]; if (!hit) return true; const u = hit.object.userData; if (u.deck !== undefined) this.setCell(L, u.deck); else if (u.pil) this.togglePillar(L, u.pil); return true; },
+  onPointer(L, ray) { const hit = ray.intersectObjects(Object.values(L.objs || {}), true).find(h => h.object.userData.deck !== undefined || h.object.userData.pil); if (!hit) return true; const u = hit.object.userData; if (u.deck !== undefined) this.setCell(L, u.deck); else if (u.pil) this.togglePillar(L, u.pil); return true; },
   async go(L) {
     if (L.ended || L.locked) return; const R = L.R;
     if (L.deck.some(m => !m)) { Sound.sfx('bump'); say('Some metres have no bridge yet! Fill every gap first 🧱', 2500); return; }
@@ -1221,11 +1237,11 @@ NEW.S1 = {
     const xEnd = brk ? xs + (brk[0] + brk[1]) / 2 : wx(13.4); const dur = (xEnd - xs) * 0.32; let snapped = false;
     await new Promise(r => tween(dur, k => {
       t.position.x = xs + (xEnd - xs) * k; const tx = t.position.x - xs;
-      sp.forEach(([a, b]) => { const on = tx > a - 0.5 && tx < b + 0.5; for (let i = a; i < b; i++) { const o = L.objs['d' + i]; if (!o) continue; const f = Math.sin(Math.PI * (i + 0.5 - a) / (b - a)); const s2 = Math.min(1.4, st[i]); o.position.y = -0.02 - (on ? f * 0.28 * s2 : 0); if (o.material.emissive) o.material.emissive.set(on ? (s2 > 1 ? '#c01010' : s2 > 0.75 ? '#a08000' : '#108a30') : '#000000'); } });
-      t.position.y = Math.max(-0.35, ...[0]) * 0 - (sp.some(([a, b]) => tx > a && tx < b) ? 0.12 : 0);
+      sp.forEach(([a, b]) => { const on = tx > a - 0.5 && tx < b + 0.5; for (let i = a; i < b; i++) { const o = L.objs['d' + i]; if (!o) continue; const f = Math.sin(Math.PI * (i + 0.5 - a) / (b - a)); const s2 = Math.min(1.4, st[i]); o.position.y = o.userData.y0 - (on ? f * 0.28 * s2 : 0); const col = on ? (s2 > 1 ? '#c01010' : s2 > 0.75 ? '#a08000' : '#108a30') : '#000000'; o.traverse(q => { if (q.material && q.material.emissive && q.material !== M.dark && q.material !== L.rope) q.material.emissive.set(col); }); } });
+      { const i = Math.floor(tx); const o = L.objs['d' + Math.min(L.R.gap - 1, Math.max(0, i))]; t.position.y = (tx > 0 && tx < L.R.gap && o) ? o.position.y + 0.07 : 0; }
     }, r));
     if (brk) {
-      snapped = true; Sound.sfx('crumble'); shake(0.3); const [a, b] = brk; for (let i = a; i < b; i++) { const o = L.objs['d' + i]; tween(0.6, k => { o.position.y = -0.02 - k * 1.4; o.rotation.z = (i - (a + b) / 2) * k * 0.4; }); }
+      snapped = true; Sound.sfx('crumble'); shake(0.3); const [a, b] = brk; for (let i = a; i < b; i++) { const o = L.objs['d' + i]; tween(0.6, k => { o.position.y = o.userData.y0 - k * 1.4; o.rotation.z = (i - (a + b) / 2) * k * 0.4; }); }
       await new Promise(r => tween(0.6, k => { t.position.y = -k * 1.3; t.rotation.z = -k * 0.7; }, r)); Sound.sfx('splash'); burst(t.position.clone().setY(0), '#7cc4ff', 24);
       const mk = sprite('❌', 0.9); mk.position.set(xs + (a + b) / 2, 1.4, wz(2)); L.grp.add(mk);
       const weak = (() => { for (let i = a; i < b; i++) { const M2 = this.mats[L.deck[i]]; if (R.load > M2.t) return `${M2.n} holds only ${M2.t} t, but the ${R.who.split(' ').slice(1).join(' ')} is ${R.load} t. Use something stronger!`; if (b - a > M2.span) return `That span is ${b - a} m, but ${M2.n} can only reach ${M2.span} m. Add a pillar ┃!`; } return 'That part was too weak.'; })();
@@ -1249,6 +1265,18 @@ const LEVELS = [
   map: ['###########', '#S...o..#*#', '#.......#b#', '#..o......#', '#......o..E', '###########'],
   intro: 'Hi, I\'m Promo! 🔥 Walk with ⬅️⬆️⬇️➡️ / W A S D, or tap the ground.',
   goal: 'Grab the 3 glowing 🔥 embers!', hints: ['Look for the glowing orange blocks 🔥. Walk into them!'], noSkip: true,
+  tracks: { '7-8': { map: ['###########', '#S..d..d#*#', '#.d...d.#b#', '#...d..d..#', '#.d.....d.E', '###########'],
+    intro: 'Hi, I\'m Promo! 🔥 Walk with ⬅️⬆️⬇️➡️ / W A S D, or tap the ground. Light the 🪔 diyas in the right number pattern!',
+    goal: 'Light the diyas in order: 2, 4, 6 … what comes next?', hints: ['Start with 2. Then add 2 each time ➕2', 'Skip the odd numbers: 5, 7 and 9 are tricks!', 'Walk onto (or tap) a diya to light it 🪔'], nums: [2, 7, 4, 9, 6, 5, 8, 10],
+    setup(L) { L.moved = false; L.next = 0; let i = 0; for (const row of grid) for (const c of row) if (c.t === 'd') { c.dnum = this.nums[i++]; addPad(c, '#8a5a2a'); const sg = cardSprite('🪔', String(c.dnum), 0.9); sg.position.set(wx(c.x), 1.2, wz(c.z)); world.add(sg); c.sg = sg; } },
+    trigger: c => c.t === 'd',
+    onEnter(c) {
+      if (!L.moved) { L.moved = true; say('Great walking! 👍 Now light the diyas: 2, 4, 6 … 🪔', 0); }
+      if (c.t !== 'd' || c.lit) return; const want = [2, 4, 6, 8, 10][L.next];
+      if (c.dnum === want) { c.lit = true; L.next++; const f = sprite('🔥', 0.6); f.position.set(wx(c.x), 0.6, wz(c.z)); world.add(f); burst(f.position, '#ffb02e', 14); Sound.sfx('collect'); S.embers++; L.rec.embers++; hud();
+        if (L.next >= 5) { openGate(); say('All 5 diyas lit! 2, 4, 6, 8, 10 🎉 The gate is open ➡️', 0); } else say(`🪔 ${[2, 4, 6, 8, 10].slice(0, L.next).join(', ')} … what comes next?`, 0); }
+      else { L.rec.fails++; L.rec.firstTry = false; Sound.sfx('bump'); say(`Not ${c.dnum}! 🤔 The pattern goes up by 2: ${[2, 4, 6, 8, 10].slice(0, L.next).join(', ') || 'start with 2'}…`, 3000); }
+    } } },
   setup(L) { L.moved = false; L.onEmber = () => { const n = L.rec.embers; if (n >= 3) { openGate(); say('The gate is open! 🎉 Walk to the gate ➡️'); } else say(`Nice! 🔥 ${n} of 3`, 0); }; },
   onEnter(c) { if (!L.moved) { L.moved = true; say('Great walking! 👍 Now grab the 3 glowing 🔥 embers!'); } },
   update: (L, dt, t) => bob(t),
@@ -1258,11 +1286,16 @@ const LEVELS = [
   map: ['############', '#..zzzzz..x#', '#S.zzzzz...#', '#..zzzzz...E', '#..zzzzz.o.#', '############'],
   intro: 'Cross the river! Step 🟧 then 🟦 then 🟧… like the pattern up top ⬆️',
   goal: 'Follow the color pattern: 🟧 🟦 🟧 🟦 …',
+  seq: ['O', 'B'], banner: ['O', 'B', 'O', 'B', 'O', 'B'],
+  path: { '3,1': 'O', '4,1': 'B', '4,2': 'O', '5,2': 'B', '5,3': 'O', '6,3': 'B', '7,3': 'O' }, fill: ['B', 'O', 'O', 'B', 'B', 'O', 'O', 'O', 'B', 'B', 'O', 'B', 'B'],
+  tracks: { '7-8': { intro: 'Cross the river! TWO rules: 🟧 🟧 then 🟦, again and again. Look at the pattern up top ⬆️', goal: 'Rule: 2 orange 🟧🟧, then 1 blue 🟦, repeat',
+    hints: ['Say it out loud: orange, orange, blue, orange, orange, blue…', 'After ONE blue you always need TWO oranges in a row.', 'Plan your path with your eyes first 👀, then walk.'],
+    seq: ['O', 'O', 'B'], banner: ['O', 'O', 'B', 'O', 'O', 'B'],
+    path: { '3,1': 'O', '4,1': 'O', '4,2': 'B', '5,2': 'O', '5,3': 'O', '6,3': 'B', '7,3': 'O' }, fill: ['B', 'O', 'B', 'B', 'O', 'B', 'O', 'B', 'B', 'O', 'B', 'O', 'B'] } },
   hints: ['Look at the colors floating above the wall ⬆️', 'Never step on the same color twice in a row!', 'Plan your path with your eyes first 👀, then walk.'],
   setup(L) {
-    openGate(true); L.last = null;
-    const path = { '3,1': 'O', '4,1': 'B', '4,2': 'O', '5,2': 'B', '5,3': 'O', '6,3': 'B', '7,3': 'O' };
-    const fill = ['B', 'O', 'O', 'B', 'B', 'O', 'O', 'O', 'B', 'B', 'O', 'B', 'B'];
+    openGate(true); L.last = null; L.k = 0;
+    const path = this.path, fill = this.fill;
     let fi = 0; L.stones = [];
     const water = new THREE.Mesh(BOX, M.water); M.water.map.repeat.set(5, 4); water.scale.set(5, 0.1, 4); water.position.set(wx(5), -0.35, (wz(1) + wz(4)) / 2); world.add(water); L.water = water;
     for (const row of grid) for (const c of row) if (c.t === 'z') {
@@ -1270,19 +1303,19 @@ const LEVELS = [
       const m = new THREE.MeshLambertMaterial({ color: c.col === 'O' ? '#f26b21' : '#3b82f6', emissive: c.col === 'O' ? '#f26b21' : '#3b82f6', emissiveIntensity: 0.1 });
       c.stone = mesh(m, wx(c.x), -0.15, wz(c.z), 0.86, 0.3, 0.86); L.stones.push(c);
     }
-    ['O', 'B', 'O', 'B', 'O', 'B'].forEach((k, i) => { const b = mesh(new THREE.MeshLambertMaterial({ color: k === 'O' ? '#f26b21' : '#3b82f6', emissive: k === 'O' ? '#f26b21' : '#3b82f6', emissiveIntensity: 0.4 }), wx(3 + i * 0.9), 2.7, wz(0), 0.6, 0.6, 0.6); b.userData.float = i; L['ban' + i] = b; });
+    this.banner.forEach((k, i) => { const b = mesh(new THREE.MeshLambertMaterial({ color: k === 'O' ? '#f26b21' : '#3b82f6', emissive: k === 'O' ? '#f26b21' : '#3b82f6', emissiveIntensity: 0.4 }), wx(3 + i * 0.9), 2.7, wz(0), 0.6, 0.6, 0.6); b.userData.float = i; L['ban' + i] = b; });
     const st = sprite('➡️', 0.6); st.position.set(wx(8.6), 2.7, wz(0)); world.add(st);
   },
   trigger: c => c.t === 'z',
   onEnter(c) {
-    if (c.t !== 'z') { L.last = null; L.stones.forEach(s => s.stone.material.emissiveIntensity = 0.1); return; }
-    const want = L.last == null ? 'O' : (L.last === 'O' ? 'B' : 'O');
-    if (c.col === want) { L.last = c.col; c.stone.material.emissiveIntensity = 0.6; Sound.tone(c.col === 'O' ? 660 : 880, 0.1, 'triangle', 0.15); }
+    if (c.t !== 'z') { L.last = null; L.k = 0; L.stones.forEach(s => s.stone.material.emissiveIntensity = 0.1); return; }
+    const want = this.seq[L.k % this.seq.length];
+    if (c.col === want) { L.last = c.col; L.k++; c.stone.material.emissiveIntensity = 0.6; Sound.tone(c.col === 'O' ? 660 : 880, 0.1, 'triangle', 0.15); }
     else {
       L.locked = true; const s = c.stone; Sound.sfx('crumble');
       tween(0.5, k => { s.position.y = -0.15 - k * 1.5; s.rotation.z = k; player.g.position.y = -k * 0.8; }, () => { Sound.sfx('splash'); burst(new THREE.Vector3(s.position.x, 0, s.position.z), '#7cc4ff', 20); });
       failLevel('Splash! 💦 That stone broke the pattern. Try again!');
-      setTimeout(() => { s.position.y = -0.15; s.rotation.z = 0; L.last = null; L.stones.forEach(q => q.stone.material.emissiveIntensity = 0.1); backToStart(0); }, 1100);
+      setTimeout(() => { s.position.y = -0.15; s.rotation.z = 0; L.last = null; L.k = 0; L.stones.forEach(q => q.stone.material.emissiveIntensity = 0.1); backToStart(0); }, 1100);
     }
   },
   update(L, dt, t) { M.water.map.offset.x += dt * 0.25; M.water.map.offset.y = Math.sin(t / 1500) * 0.05; for (let i = 0; i < 6; i++) { const b = L['ban' + i]; if (b) { b.position.y = 2.7 + Math.sin(t / 300 + i * 0.7) * 0.1; b.rotation.y += dt; } } },
@@ -1416,6 +1449,7 @@ NEW.W1,
 {
   id: 'L4', name: 'Crate Crush', emoji: '📦', skill: 'logic', skillLabel: 'Planning',
   map: ['##########', '#S...#...#', '#.C..#.o.#', '#..C...PP#', '#....#...#', '#x...#...#', '#######E##'],
+  tracks: { '7-8': { map: ['##########', '#S...#...#', '#..C.#.o.#', '#.#C...P.#', '#....#.#P#', '#x.#.#...#', '#######E##'], intro: 'Push the 📦 crates onto the 🟨 plates. This one is TIGHT: plan every push!', hints: ['You can only push, never pull. One wrong push can trap a crate.', 'One plate is around a corner. Which crate should go there first? 🤔', 'Stuck? Press ↺ Reset and try a new order.'] } },
   intro: 'Push the 📦 crates onto the 🟨 yellow plates to open the gate!',
   goal: 'Push both 📦 onto the 🟨 plates. Stuck? Press ↺ Reset',
   hints: ['Walk into a crate to push it ➡️', 'You can only push, never pull. Think before you push!', 'Get behind a crate and line it up with the plates 🟨'],
@@ -1510,7 +1544,7 @@ NEW.S1,
 {
   id: 'L7', name: 'Pattern Builder', emoji: '🧱', skill: 'creativity', skillLabel: 'Pattern Copy (hard)',
   map: ['..........', '..........', '..........', '..........', '..........', '..........', '..........'],
-  intro: 'PATTERN BUILDER! 🧱 Remember the picture: it hides after 5 seconds! Pick a colour, then tap a square.',
+  intro: 'PATTERN BUILDER! 🧱 Remember the picture: after 5 seconds most squares hide. Each right block uncovers its square! Pick a colour, then tap a square.',
   goal: 'Make your grid look EXACTLY like the picture ⏱️', noWalk: true, noSkip: true, ownTimer: true,
   hints: ['Look at the picture row by row and say the colours in your head 🧠', 'Green ✅ = right colour. Tap a square again to change it.', 'Peek 👀 costs 8 seconds. Use it when you are stuck.', 'Mirror round: left becomes right, like in a mirror 🪞'],
   cols: { R: ['#e53935', 'Red'], Y: ['#ffd23f', 'Yellow'], B: ['#3b82f6', 'Blue'], G: ['#2fa86b', 'Green'], O: ['#f26b21', 'Orange'], W: ['#f5f5f5', 'White'], P: ['#b46bff', 'Purple'] },
@@ -1535,8 +1569,11 @@ NEW.S1,
     const fm = new THREE.MeshBasicMaterial({ color: '#f26b21' }); const cx = wx(3), cz = wz(3), h = n / 2 + 0.05;
     [[cx, cz - h, n + 0.2, 0.1], [cx, cz + h, n + 0.2, 0.1], [cx - h, cz, 0.1, n + 0.2], [cx + h, cz, 0.1, n + 0.2]].forEach(([x, z, sx, sz2]) => mesh(fm, x, 0.12, z, sx, 0.06, sz2, L.grp));
     const need = [...new Set(P.g.join(''))]; const dec = (P.decoy || '').split('').filter(k => !need.includes(k)); for (const k of shuffle(Object.keys(this.cols))) if (dec.length < 2 && !need.includes(k) && !dec.includes(k)) dec.push(k); const pal = shuffle([...need, ...dec]); L.mat = pal[0];
-    L.cover = new THREE.Group(); const cv = new THREE.Mesh(BOX, new THREE.MeshLambertMaterial({ color: '#1a2a4f' })); cv.scale.set(2.8, 2.8, 0.3); cv.position.z = 0.15; L.cover.add(cv); const q = sprite('❓', 1.4); q.position.z = 0.4; L.cover.add(q); L.cover.visible = false; L.stand.add(L.cover);
-    L.showT = this.showSec; L.peeks = 0;
+    // after the 5 s view the picture fades cell by cell to a few anchor cells; each right block uncovers its cell again
+    L.covers = {}; L.cover = new THREE.Group(); const keepN = n <= 3 ? 4 : 5; const flat = P.g.join(''), keep = new Set(); for (const k of shuffle([...Array(n * n).keys()])) if (keep.size < 2 && ![...keep].some(q => flat[q] === flat[k])) keep.add(k); for (const k of shuffle([...Array(n * n).keys()])) if (keep.size < keepN) keep.add(k); const cvM = new THREE.MeshLambertMaterial({ color: '#1a2a4f' });
+    for (let k = 0; k < n * n; k++) { if (keep.has(k)) continue; const x = k % n, z = Math.floor(k / n); const cv = new THREE.Mesh(BOX, cvM); cv.scale.set(sz * 0.96, sz * 0.96, 0.24); cv.position.set((x - (n - 1) / 2) * sz, ((n - 1) / 2 - z) * sz, 0.12); L.cover.add(cv); const q = sprite('❓', sz * 0.7); q.position.set(cv.position.x, cv.position.y, 0.3); L.cover.add(q); L.covers[k] = [cv, q]; }
+    L.cover.visible = false; L.stand.add(L.cover);
+    L.showT = this.showSec; L.peeks = 0; L.faded = false;
     const bar = $('#buildBar'); bar.innerHTML = pal.map(k => `<button data-c="${k}" class="pal ${k === L.mat ? 'sel' : ''}" style="background:${this.cols[k][0]}"><span>&nbsp;</span><small>${this.cols[k][1]}</small></button>`).join('') + `<button class="txt done" data-x="done">✅ Done</button>`;
     bar.querySelectorAll('button').forEach(b => b.onclick = () => { Sound.sfx('click'); if (b.dataset.c) { L.mat = b.dataset.c; bar.querySelectorAll('button').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); } else if (!L.ended) this.endRound(L, 'done'); });
     panel(`<div class="bpanel"><b>Round ${L.round + 1}/${this.pats.length}: ${P.name}</b><span id="bpTime">⏱️ ${P.time}s</span><span id="bpMatch">✅ 0 / ${n * n}</span><button class="pk" id="bpPeek">👀 Peek (−${this.peekCost}s)</button></div><div class="mbar"><i id="bpBar"></i></div>${P.mirror ? '<div class="pbig">🪞 MIRROR ROUND: build the mirror image (flip left ↔ right)!</div>' : ''}`);
@@ -1548,7 +1585,7 @@ NEW.S1,
     if (c.blk) L.grp.remove(c.blk); if (c.have === k) { c.have = null; c.blk = null; Sound.sfx('bump'); this.live(L); return; }
     c.have = k; const b = mesh(new THREE.MeshLambertMaterial({ color: this.cols[k][0] }), c.tile.position.x, 0.4, c.tile.position.z, 0.86, 0.6, 0.86, L.grp); b.userData.pc = { x, z }; c.blk = b;
     b.scale.setScalar(0.01); tween(0.2, q => b.scale.set(0.86 * (q + Math.sin(q * Math.PI) * 0.2), 0.6 * (q + Math.sin(q * Math.PI) * 0.3), 0.86 * (q + Math.sin(q * Math.PI) * 0.2)));
-    if (k === c.want) { const t = sprite('✅', 0.45); t.position.set(0, 0.75, 0); t.scale.set(0.5 / 0.86, 0.5 / 0.6, 1); b.add(t); burst(b.position, '#2fa86b', 6, 1.5); Sound.tone(600 + this.count(L) * 40, 0.1, 'triangle', 0.15); }
+    if (k === c.want) { const pi = c.z * L.n + (L.P.mirror ? L.n - 1 - c.x : c.x); const cvp = L.covers && L.covers[pi]; if (cvp) { cvp.forEach(o => L.cover.remove(o)); delete L.covers[pi]; } const t = sprite('✅', 0.45); t.position.set(0, 0.75, 0); t.scale.set(0.5 / 0.86, 0.5 / 0.6, 1); b.add(t); burst(b.position, '#2fa86b', 6, 1.5); Sound.tone(600 + this.count(L) * 40, 0.1, 'triangle', 0.15); }
     else { Sound.sfx('place'); say('Hmm, look at the picture again for that square 👀', 1800); }
     this.live(L);
   },
@@ -1575,82 +1612,123 @@ NEW.S1,
   update(L, dt, t) {
     if (L.stand && !L.ended) L.stand.position.y = 2.3 + Math.sin(t / 500) * 0.05;
     if (L.ended || L.finishing || L.locked || !L.P) return;
-    if (L.showT > 0) { L.showT -= dt; if (L.showT <= 0 && L.cover) { L.cover.visible = true; Sound.sfx('click'); } } const pk = $('#bpPeek'); if (pk) pk.disabled = L.showT > 0;
+    if (L.showT > 0) { L.showT -= dt; if (L.showT <= 0 && L.cover) { L.cover.visible = true; if (!L.faded) { L.faded = true; Object.values(L.covers).forEach((pair, i) => pair.forEach(o => { const s0 = o.scale.clone(); o.scale.setScalar(0.001); setTimeout(() => { tween(0.25, k => o.scale.copy(s0).multiplyScalar(Math.max(0.001, k))); if (o.isSprite) Sound.tone(300 + i * 25, 0.05, 'triangle', 0.06); }, i * 90); })); } else Sound.sfx('click'); } } const pk = $('#bpPeek'); if (pk) pk.disabled = L.showT > 0;
     L.tLeft -= dt; const el = $('#bpTime'); if (el) { el.textContent = `⏱️ ${Math.max(0, Math.ceil(L.tLeft))}s`; el.classList.toggle('low', L.tLeft < 15); }
     if (L.tLeft <= 0) this.endRound(L, 'time');
   }
 },
 {
-  id: 'L8', name: 'Shadow Golem', emoji: '👹', skill: 'boss', skillLabel: 'Final Boss!', music: 'boss', floor: 'stone', camZ: -1.2, sky: '#3d3a63',
+  id: 'L8', name: 'Shadow Golem', emoji: '👹', skill: 'boss', skillLabel: 'Final Boss! (very hard)', music: 'boss', floor: 'stone', camZ: -1.2, sky: '#3d3a63', skipFails: true,
   map: ['###############', '#.............#', '#.............#', '#.............#', '#.............#', '#.............#', '#.............#', '#.............#', '#......S......#', '###############'],
-  intro: 'The Shadow Golem! 😱 Grab glowing 🔥 embers to throw fire at it. Dodge the RED tiles!',
-  goal: 'Grab 🔥 to attack. Step OFF red tiles!',
-  hints: ['When tiles turn RED, quickly step onto a normal tile!', 'Grab the glowing 🔥 ember. You throw it at the golem automatically!', 'Stay in the middle so you can move any way.'],
+  intro: 'The Shadow Golem! 😱 Solve the 🔷 runes to break its shield, then grab 🔥 embers to hit it!',
+  goal: 'Runes ➜ shield down ➜ grab 🔥. Dodge red tiles, waves, minions and falling rocks!',
+  hints: ['Step on the 🔷 runes from SMALLEST to BIGGEST to break the shield.', 'Red tiles and red waves hurt. Step sideways out of the way!', 'Dark shadows on the floor = a rock is falling there. Move!', 'Minions 👾 chase you. Keep moving and lead them away.'],
+  sp: 1, minions: 2,
+  runes: [[3, 7, 12], [15, 9, 21], [18, 27, 24]], runeLabels: null,
+  tracks: { '7-8': { sp: 1.3, minions: 3, runes: [[9, 8, 10], [16, 20, 12], [27, 30, 25]], runeLabels: [['3²', '2³', '10'], ['4²', '5×4', '√144'], ['3³', '6×5', '5²']],
+    hints: ['Work out each rune first (3² = 9, 2³ = 8), then step from SMALLEST to BIGGEST.', 'Red waves travel toward you. Step sideways!', 'Shadows = falling rocks. Minions are faster here, keep moving!'] } },
+  solid: c => !!c.hole,
   setup(L) {
-    L.hearts = 3; L.hits = 0; L.need = 3; L.atkT = 6; L.fightT = 0; L.paused = true; L.warn = null; L.inv = 0; L.redObjs = [];
-    const g = new THREE.Group(); const dm = M.dark, eye = new THREE.MeshBasicMaterial({ color: '#c04dff' });
+    L.hearts = 3; L.phase = 1; L.hp = 9; L.atkT = 5; L.fightT = 0; L.paused = true; L.warn = null; L.inv = 0; L.redObjs = []; L.waves = []; L.mins = []; L.rocks = []; L.runeObjs = []; L.shield = true; L.holes = 0; L.minT = 4; L.rockT = 5; L.crT = 7;
+    const g = new THREE.Group(); const dm = M.dark; L.eyeM = new THREE.MeshBasicMaterial({ color: '#c04dff' }); const eye = L.eyeM;
     mesh(dm, -0.8, 1, 0, 0.9, 2, 0.9, g); mesh(dm, 0.8, 1, 0, 0.9, 2, 0.9, g); const body = mesh(dm, 0, 3, 0, 3, 2.4, 1.6, g);
     const head = new THREE.Group(); head.position.set(0, 4.9, 0); g.add(head); mesh(dm, 0, 0, 0, 1.6, 1.4, 1.4, head); mesh(eye, -0.38, 0.1, 0.71, 0.36, 0.24, 0.05, head); mesh(eye, 0.38, 0.1, 0.71, 0.36, 0.24, 0.05, head);
     const aL = new THREE.Group(); aL.position.set(-1.9, 3.9, 0); g.add(aL); mesh(dm, 0, -1.1, 0, 0.8, 2.4, 0.8, aL);
     const aR = new THREE.Group(); aR.position.set(1.9, 3.9, 0); g.add(aR); mesh(dm, 0, -1.1, 0, 0.8, 2.4, 0.8, aR);
     [[-1, 3.6], [0.7, 2.4], [0.2, 3.9]].forEach(([x, y]) => mesh(new THREE.MeshBasicMaterial({ color: '#7a2fbf' }), x, y, 0.81, 0.3, 0.3, 0.02, g));
-    g.position.set(0, 0, wz(0) - 1.3); g.scale.setScalar(1); world.add(g); L.golem = { g, head, aL, aR, body };
+    L.shieldObj = new THREE.Mesh(new THREE.SphereGeometry(3.6, 16, 12), new THREE.MeshBasicMaterial({ color: '#7fd4ff', transparent: true, opacity: 0.25, depthWrite: false })); L.shieldObj.position.y = 3; g.add(L.shieldObj);
+    g.position.set(0, 0, wz(0) - 1.3); world.add(g); L.golem = { g, head, aL, aR, body };
     L.golemLight = new THREE.PointLight('#b04dff', 3, 8); L.golemLight.position.set(0, 4, wz(0)); world.add(L.golemLight);
     L.onEmber = () => this.fireball(L);
-    show('#hearts', true); this.hearts(L); this.spawnOrb(L);
+    const bar = document.createElement('div'); bar.id = 'bossBar'; bar.innerHTML = '<span id="bossName">👹 Shadow Golem · Phase 1/3</span><div class="bb"><i id="bossHp"></i></div>'; document.body.appendChild(bar);
+    show('#hearts', true); this.hearts(L); this.placeRunes(L);
   },
+  cleanup(L) { const b = $('#bossBar'); if (b) b.remove(); },
   async start(L) {
     L.paused = true;
     await modal(`<h2>How to beat the Golem 👹</h2><div class="howto">
-      <div class="hstep"><div class="hart"><span class="hero">🧍</span><span class="go">➜</span><span class="big">🔥</span></div><b>1. Grab an ember</b><small>Walk into the glowing 🔥</small></div>
-      <div class="hstep"><div class="hart"><span class="big">🔥</span><span class="go arc">➶</span><span class="big">👹</span></div><b>2. It flies at the Golem!</b><small>Hit it 3 times 💥💥💥</small></div>
-      <div class="hstep"><div class="hart"><span class="mini-tile red"></span><span class="go">➜</span><span class="mini-tile"></span></div><b>3. Step OFF red tiles</b><small>Red = the Golem will SMASH there</small></div>
-    </div><p class="small">You have ❤️❤️❤️. If you lose them all, just try again!</p><button class="btn primary huge" id="gGo">Got it - Start! ▶</button>`, (el, done) => el.querySelector('#gGo').onclick = done);
-    L.paused = false; L.fightT = 0; L.atkT = 6; say('Grab the 🔥 ember first! The Golem is slow… for now.', 4000);
+      <div class="hstep"><div class="hart"><span class="big">🔷</span><span class="go">➜</span><span class="big">🛡️</span></div><b>1. Solve the runes</b><small>Step on them smallest ➜ biggest to break the shield</small></div>
+      <div class="hstep"><div class="hart"><span class="hero">🧍</span><span class="go">➜</span><span class="big">🔥</span></div><b>2. Grab embers</b><small>3 hits per phase, 3 phases 💥</small></div>
+      <div class="hstep"><div class="hart"><span class="mini-tile red"></span><span class="go">➜</span><span class="mini-tile"></span></div><b>3. Dodge!</b><small>Red tiles, waves, 👾 minions, falling-rock shadows</small></div>
+    </div><p class="small">You have ❤️❤️❤️. Lose them all and you retry the SAME phase.</p><button class="btn primary huge" id="gGo">Got it - Start! ▶</button>`, (el, done) => el.querySelector('#gGo').onclick = done);
+    L.paused = false; L.fightT = 0; L.atkT = 5; say('Phase 1! Step on the 🔷 runes from smallest to biggest to break the shield!', 5000);
   },
-  hearts(L) { $('#hearts').textContent = '❤️'.repeat(L.hearts) + '🖤'.repeat(3 - L.hearts) + `  👹 ${'💥'.repeat(L.hits)}${'⬜'.repeat(L.need - L.hits)}`; },
-  floorCells() { const a = []; for (const row of grid) for (const c of row) if (c.t === '.') a.push(c); return a; },
+  hearts(L) { $('#hearts').textContent = '❤️'.repeat(Math.max(0, L.hearts)) + '🖤'.repeat(3 - Math.max(0, L.hearts)); const h = $('#bossHp'); if (h) h.style.width = (100 * L.hp / 9) + '%'; const n = $('#bossName'); if (n) n.textContent = `👹 Shadow Golem · Phase ${L.phase}/3${L.shield ? ' · 🛡️' : ' · shield DOWN!'}`; },
+  floorCells() { const a = []; for (const row of grid) for (const c of row) if (c.t === '.' && !c.hole) a.push(c); return a; },
+  placeRunes(L) {
+    L.runeObjs.forEach(o => world.remove(o)); L.runeObjs = []; for (const row of grid) for (const c of row) if (c.rune) { c.rune = null; c.trigger = false; }
+    const vals = this.runes[L.phase - 1], labs = this.runeLabels ? this.runeLabels[L.phase - 1] : vals.map(String);
+    const cs = shuffle(this.floorCells().filter(c => c.z >= 2 && c.z <= 7 && Math.abs(c.x - player.x) + Math.abs(c.z - player.z) >= 3)); const used = [];
+    for (const c of cs) { if (used.length >= 3) break; if (used.some(u => Math.abs(u.x - c.x) + Math.abs(u.z - c.z) < 3)) continue; used.push(c); }
+    L.runeOrder = [...vals].sort((a, b) => a - b); L.runeNext = 0;
+    used.forEach((c, i) => { c.rune = { v: vals[i] }; c.trigger = true; const p = mesh(new THREE.MeshLambertMaterial({ color: '#3b82f6', emissive: '#3b82f6', emissiveIntensity: 0.4 }), wx(c.x), 0.05, wz(c.z), 0.86, 0.1, 0.86); const sg = cardSprite('🔷', labs[i], 0.9); sg.position.set(wx(c.x), 1.25, wz(c.z)); world.add(sg); c.rune.p = p; c.rune.sg = sg; L.runeObjs.push(p, sg); });
+    L.shield = true; L.shieldObj.visible = true; this.hearts(L);
+  },
+  onEnter(c) {
+    if (!c.rune || c.rune.done || !L.shield) return; const D = L.def;
+    if (c.rune.v === L.runeOrder[L.runeNext]) { c.rune.done = true; L.runeNext++; if (L.mins.length) { const m = L.mins.shift(); burst(m.o.position, '#7fd4ff', 14, 2); world.remove(m.o); } c.rune.p.material.color.set('#2fa86b'); c.rune.p.material.emissive.set('#2fa86b'); Sound.tone(500 + L.runeNext * 150, 0.15, 'triangle', 0.2);
+      if (L.runeNext >= 3) { L.shield = false; L.shieldObj.visible = false; Sound.sfx('gate'); burst(new THREE.Vector3(0, 3, wz(0) - 1.3), '#7fd4ff', 40, 5); say('🛡️💥 SHIELD DOWN! Grab the 🔥 embers and hit it!', 3000); D.hearts(L); setTimeout(() => { L.runeObjs.forEach(o => world.remove(o)); L.runeObjs = []; }, 600); D.spawnOrb(L); }
+    } else { Sound.sfx('wrong'); say('Wrong order! 🔷 Start again: smallest ➜ biggest.', 2500); for (const row of grid) for (const q of row) if (q.rune) { q.rune.done = false; q.rune.p.material.color.set('#3b82f6'); q.rune.p.material.emissive.set('#3b82f6'); } L.runeNext = 0; }
+  },
   spawnOrb(L) {
-    if (L.won) return; const cs = this.floorCells().filter(c => !c.ember && Math.abs(c.x - player.x) + Math.abs(c.z - player.z) >= 3 && !(L.warn && L.warn.has(c)));
-    const c = pick(cs); addEmber(c); burst(c.obj.position, '#ffb02e', 10);
+    if (L.won || L.shield) return; const cs = this.floorCells().filter(c => !c.ember && !c.rune && Math.abs(c.x - player.x) + Math.abs(c.z - player.z) >= 3 && !(L.warn && L.warn.has(c)));
+    const c = pick(cs); if (!c) return; addEmber(c); burst(c.obj.position, '#ffb02e', 10);
   },
   fireball(L) {
-    Sound.sfx('fire'); const f = new THREE.Mesh(BOX, M.ember); f.scale.setScalar(0.5); world.add(f); const a = player.g.position.clone().setY(1), b = new THREE.Vector3(0, 4.2, wz(0) - 1.4);
-    const pl = new THREE.PointLight('#ff8a2a', 3, 6); f.add(pl);
+    Sound.sfx('fire'); const f = new THREE.Mesh(BOX, M.ember); f.scale.setScalar(0.5); world.add(f); const a = player.g.position.clone().setY(1), b = L.golem.g.position.clone().setY(4.2);
     tween(0.7, k => { f.position.lerpVectors(a, b, k); f.position.y += Math.sin(k * Math.PI) * 2.5; f.rotation.x += 0.3; }, () => {
-      world.remove(f); burst(b, '#ff7a1a', 30, 4); Sound.sfx('hit'); shake(0.3); L.hits++; this.hearts(L);
+      world.remove(f); burst(b, '#ff7a1a', 30, 4); Sound.sfx('hit'); shake(0.3); L.hp--; this.hearts(L);
       L.golem.body.material = new THREE.MeshBasicMaterial({ color: '#ffffff' }); setTimeout(() => L.golem.body.material = M.dark, 150);
-      if (L.hits >= L.need) this.win(L); else { say(L.hits === 1 ? 'HIT! 🔥💥 2 more!' : 'HIT! 🔥💥 One more! The golem is angry!', 2500); setTimeout(() => this.spawnOrb(L), 900); }
+      if (L.hp <= 0) return this.win(L);
+      if (L.hp % 3 === 0) return this.nextPhase(L);
+      say(`HIT! 🔥💥 ${L.hp % 3} more this phase!`, 2000); setTimeout(() => this.spawnOrb(L), 700);
     });
   },
+  async nextPhase(L) {
+    L.phase++; this.clearAll(L); L.paused = true; Sound.sfx('slam'); shake(0.5);
+    if (L.phase === 3) { L.eyeM.color.set('#ff2d2d'); L.golemLight.color.set('#ff3030'); scene.background = new THREE.Color('#4a2030'); }
+    await showBanner(L.phase === 2 ? '👹 Phase 2: FASTER! Minions + falling rocks!' : '👹😡 Phase 3: ENRAGED! The floor is crumbling!', 1800);
+    L.phaseStart = { hp: L.hp }; this.placeRunes(L); L.atkT = 3; L.minT = 2; L.rockT = 3; L.crT = 4; L.paused = false;
+    say('Shield is back! 🔷 Solve the new runes: smallest ➜ biggest.', 3500);
+  },
+  clearAll(L) { this.clearRed(L); L.waves.forEach(w => { world.remove(w.o); world.remove(w.lane); }); L.waves = []; L.mins.forEach(m => world.remove(m.o)); L.mins = []; L.rocks.forEach(r => { world.remove(r.sh); if (r.o) world.remove(r.o); }); L.rocks = []; for (const row of grid) for (const c of row) if (c.ember) { world.remove(c.obj); c.ember = false; } },
   clearRed(L) { L.redObjs.forEach(o => world.remove(o)); L.redObjs = []; L.warn = null; },
+  hurt(L, why) {
+    if (L.inv > 0 || L.won || L.paused) return; const H = window.__pqHurt = window.__pqHurt || {}; H[why] = (H[why] || 0) + 1; L.hearts--; L.inv = 1.3; Sound.sfx('hurt'); shake(0.2); this.hearts(L); tween(0.6, k => player.g.visible = Math.floor(k * 8) % 2 === 0, () => player.g.visible = true);
+    if (L.hearts <= 0) { this.lose(L); return; } say(`Ouch! 💔 ${why}`, 1800);
+  },
   attack(L) {
-    const cs = this.floorCells(); const pats = [
-      c => c.z % 2 === (L.hits % 2), c => c.x % 2 === 1, c => (c.x + c.z) % 2 === 0,
-      c => Math.abs(c.x - player.x) <= 1 && Math.abs(c.z - player.z) <= 1, c => c.z === player.z || c.x === player.x];
-    const f = L.fightT < 25 && L.hits === 0 ? pick([pats[3], pats[0]]) : pick(pats);
-    L.warn = new Set(cs.filter(f)); L.warnT = L.warnT0 = Math.max(1.6, 3.4 - 0.45 * L.hits - 0.015 * L.fightT);
+    const cs = this.floorCells(); const p = L.phase; const pats = [
+      c => Math.abs(c.x - player.x) <= 1 && Math.abs(c.z - player.z) <= 1, c => c.z % 2 === (L.hp % 2), c => c.x % 2 === 1, c => (c.x + c.z) % 2 === 0, c => c.z === player.z || c.x === player.x];
+    const f = p === 1 ? pick([pats[0], pats[0], pats[1]]) : pick(pats);
+    L.warn = new Set(cs.filter(c => f(c) && !c.rune)); L.warnT = L.warnT0 = Math.max(1.3, (2.6 - 0.35 * p) / this.sp);
     L.warn.forEach(c => { const o = mesh(M.red, wx(c.x), 0.03, wz(c.z), 0.94, 0.04, 0.94); o.castShadow = false; L.redObjs.push(o); });
-    Sound.sfx('warn'); say('⚠️ RED tiles! Step off them!', 1800);
+    Sound.sfx('warn');
   },
   slam(L) {
-    Sound.sfx('slam'); shake(0.4); L.redObjs.forEach(o => { burst(o.position, '#5a4a7a', 2, 2); });
-    const pc = cell(player.x, player.z);
-    if (L.warn.has(pc) && L.inv <= 0) {
-      L.hearts--; L.inv = 1.2; Sound.sfx('hurt'); this.hearts(L); tween(0.6, k => player.g.visible = Math.floor(k * 8) % 2 === 0, () => player.g.visible = true);
-      if (L.hearts <= 0) { this.clearRed(L); this.lose(L); return; }
-      say('Ouch! 💔 Watch for red tiles!', 2000);
-    }
-    this.clearRed(L); L.atkT = Math.max(2.0, 5 - L.hits * 1.0 - L.fightT * 0.02);
+    Sound.sfx('slam'); shake(0.35); const pc = cell(player.x, player.z); const hit = L.warn && L.warn.has(pc); this.clearRed(L);
+    if (hit) this.hurt(L, 'Step off the red tiles!'); if (L.hearts <= 0) return;
+    // shockwave: a red wave rolls toward the player from the golem's x
+    const x0 = Math.round(L.golem.g.position.x + (GW - 1) / 2); const o = mesh(M.red, wx(x0), 0.08, wz(1), 3, 0.12, 0.9); o.material = M.red; const lane = mesh(new THREE.MeshBasicMaterial({ color: '#ff2d2d', transparent: true, opacity: 0.16, depthWrite: false }), wx(x0), 0.02, (wz(1) + wz(GH - 2)) / 2, 3, 0.02, GH - 2); L.waves.push({ o, lane, x0, z: 1, delay: 0.9 });
+    L.atkT = Math.max(1.6, (4.4 - L.phase * 0.7) / this.sp) + (L.phase === 3 ? 0 : 0.6);
+    if (L.phase === 3) L.rockT = Math.min(L.rockT, 0.3); // combo: slam + rocks
   },
+  dropRock(L) {
+    const near = this.floorCells().filter(c => Math.abs(c.x - player.x) <= 2 && Math.abs(c.z - player.z) <= 2 && !c.rune); const n = L.phase === 3 ? 3 : 2;
+    shuffle(near).slice(0, n).forEach(c => { const sh = mesh(new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.2, depthWrite: false }), wx(c.x), 0.05, wz(c.z), 0.9, 0.02, 0.9); L.rocks.push({ c, sh, t: 1.3 / Math.sqrt(this.sp) }); });
+  },
+  crumble(L) {
+    if (L.holes >= 10) return; const cs = this.floorCells().filter(c => !c.rune && !c.ember && Math.abs(c.x - player.x) + Math.abs(c.z - player.z) >= 2 && c.z >= 1);
+    for (const c of shuffle(cs)) { c.hole = true; if (!this.connected()) { c.hole = false; continue; } L.holes++; const o = mesh(M.dark, wx(c.x), -0.05, wz(c.z), 0.98, 0.12, 0.98); o.material = new THREE.MeshBasicMaterial({ color: '#0b0814' }); Sound.sfx('crumble'); burst(new THREE.Vector3(wx(c.x), 0.1, wz(c.z)), '#6a5a7a', 10, 2); break; }
+  },
+  connected() { const fl = this.floorCells(); if (!fl.length) return true; const seen = new Set([fl[0]]); const q = [fl[0]]; while (q.length) { const c = q.shift(); for (const [dx, dz] of Object.values(DIRS)) { const n = cell(c.x + dx, c.z + dz); if (n && n.t === '.' && !n.hole && !seen.has(n)) { seen.add(n); q.push(n); } } } return seen.size === fl.length; },
   async lose(L) {
-    L.locked = true; L.paused = true; failLevel(); player.queue = [];
-    await modal(`<h2>💥 The golem got you!</h2><p class="story-text">Heroes never give up! Try again? 💪</p><button class="btn primary">Try again 🔥</button>`, (el, done) => el.querySelector('button').onclick = done);
-    for (const row of grid) for (const c of row) if (c.ember) { world.remove(c.obj); c.ember = false; }
-    L.hearts = 3; L.hits = 0; L.fightT = 0; this.hearts(L); placePlayer(L.start[0], L.start[1]); L.atkT = 6; L.paused = false; L.locked = false; this.spawnOrb(L);
+    L.locked = true; L.paused = true; failLevel(); player.queue = []; this.clearAll(L);
+    await modal(`<h2>💥 The golem got you!</h2><p class="story-text">Heroes never give up! You will restart at <b>Phase ${L.phase}</b> 💪</p><button class="btn primary">Try again 🔥</button>`, (el, done) => el.querySelector('button').onclick = done);
+    L.hearts = 3; L.hp = (3 - L.phase + 1) * 3; L.fightT = 0; placePlayer(L.start[0], L.start[1]); this.placeRunes(L); L.atkT = 4; L.minT = 3; L.rockT = 4; L.crT = 5; L.paused = false; L.locked = false; this.hearts(L);
   },
   async win(L) {
-    L.won = true; L.locked = true; this.clearRed(L); scene.background = new THREE.Color('#3d3a63'); Sound.sfx('boom'); shake(0.6);
+    L.won = true; L.locked = true; this.clearAll(L); const bb = $('#bossBar'); if (bb) bb.remove(); scene.background = new THREE.Color('#3d3a63'); Sound.sfx('boom'); shake(0.6);
     const G = L.golem.g; G.traverse(o => { if (o.isMesh) burst(o.getWorldPosition(new THREE.Vector3()), pick(['#3a3550', '#7a2fbf', '#c04dff']), 6, 4); });
     tween(1, k => { G.scale.setScalar(1 - k); G.rotation.z = k * 0.5; }, () => world.remove(G)); L.golemLight.intensity = 0;
     await showBanner('👹💥 Golem defeated!', 1600);
@@ -1669,11 +1747,28 @@ NEW.S1,
     completeLevel();
   },
   update(L, dt, t) {
-    if (L.won || L.paused || L.locked && !L.warn) { return; }
-    const G = L.golem; G.head.rotation.y = Math.sin(t / 600) * 0.3; G.g.position.y = Math.sin(t / 400) * 0.05;
-    L.inv -= dt; L.fightT += dt;
+    if (L.won || L.paused || L.locked) return;
+    const G = L.golem, D = this, sp = this.sp; G.head.rotation.y = Math.sin(t / 600) * 0.3; G.g.position.y = Math.sin(t / 400) * 0.05; L.inv -= dt; L.fightT += dt;
+    if (L.shieldObj.visible) L.shieldObj.material.opacity = 0.2 + Math.sin(t / 200) * 0.08;
+    // chase: the golem slides along the back wall to follow the player
+    const tx = THREE.MathUtils.clamp(wx(player.x), -5, 5); G.g.position.x += (tx - G.g.position.x) * Math.min(1, dt * 0.5 * L.phase * sp); L.golemLight.position.x = G.g.position.x;
     if (L.warn) { L.warnT -= dt; const k = Math.max(0, L.warnT); G.aL.rotation.x = G.aR.rotation.x = -Math.min(1, (L.warnT0 - k) / L.warnT0 * 1.5) * 2.2; L.redObjs.forEach(o => o.material.opacity = 0.35 + Math.abs(Math.sin(t / (k < 0.8 ? 60 : 140))) * 0.45); if (L.warnT <= 0) { G.aL.rotation.x = G.aR.rotation.x = 0; this.slam(L); } }
     else { L.atkT -= dt; if (L.atkT <= 0) this.attack(L); }
+    // shockwaves roll forward
+    L.waves = L.waves.filter(w => { if (w.delay > 0) { w.delay -= dt; return true; } w.z += dt * 2.4 * sp; w.o.position.z = wz(w.z); if (Math.round(w.z) === player.z && Math.abs(player.x - w.x0) <= 1) this.hurt(L, 'Jump sideways out of the red wave!'); if (w.z > GH - 1) { world.remove(w.o); world.remove(w.lane); return false; } return true; });
+    if (L.phase >= 2) {
+      L.minT -= dt; if (L.minT <= 0 && L.mins.length < this.minions) { const c = pick(this.floorCells().filter(c => c.z === 1)); if (c) { const o = new THREE.Group(); mesh(M.dark, 0, 0.3, 0, 0.55, 0.55, 0.55, o); const e = sprite('👾', 0.5); e.position.y = 0.85; o.add(e); o.position.set(wx(c.x), 0, wz(c.z)); world.add(o); L.mins.push({ o, x: c.x, z: c.z, t: 0, life: 8 }); } L.minT = 5.5 / sp; }
+      L.mins = L.mins.filter(m => { m.t += dt; m.life -= dt; if (m.t > 0.95 / sp) { m.t = 0; const dx = Math.sign(player.x - m.x), dz = Math.sign(player.z - m.z); const opts = [[dx, 0], [0, dz]].filter(([a, b]) => (a || b) && (() => { const n = cell(m.x + a, m.z + b); return n && n.t === '.' && !n.hole; })()); if (opts.length) { const [a, b] = pick(opts); m.x += a; m.z += b; } }
+        m.o.position.x += (wx(m.x) - m.o.position.x) * Math.min(1, dt * 8); m.o.position.z += (wz(m.z) - m.o.position.z) * Math.min(1, dt * 8);
+        if (m.x === player.x && m.z === player.z) { this.hurt(L, 'A minion 👾 caught you. Keep moving!'); burst(m.o.position, '#5a4a7a', 10); world.remove(m.o); return false; }
+        if (m.life <= 0) { burst(m.o.position, '#5a4a7a', 8); world.remove(m.o); return false; } return true; });
+      L.rockT -= dt; if (L.rockT <= 0) { this.dropRock(L); L.rockT = (L.phase === 3 ? 4 : 5) / sp; }
+    }
+    L.rocks = L.rocks.filter(r => { r.t -= dt; r.sh.material.opacity = Math.min(0.75, 0.2 + (1.3 - r.t) * 0.5); if (r.t <= 0 && !r.o) { r.o = mesh('stone', wx(r.c.x), 6, wz(r.c.z), 0.8, 0.8, 0.8); r.fall = 0; }
+      if (r.o) { r.fall += dt; r.o.position.y = Math.max(0.4, 6 - r.fall * r.fall * 40); if (r.o.position.y <= 0.4 && !r.landed) { r.landed = true; Sound.sfx('bump'); burst(r.o.position, '#8a8a9a', 8, 2); if (player.x === r.c.x && player.z === r.c.z) this.hurt(L, 'A rock fell on you! Watch the shadows.'); r.end = 0.5; }
+        if (r.landed) { r.end -= dt; if (r.end <= 0) { world.remove(r.o); world.remove(r.sh); return false; } } } return true; });
+    if (L.phase === 3) { L.crT -= dt; if (L.crT <= 0) { this.crumble(L); this.crumble(L); L.crT = 5 / sp; } }
+
   },
 },
 ];
@@ -1775,33 +1870,34 @@ window.PQ_submitRecord = submitRecord;
 // Grand finale: fly to a giant torch on the last island, ignite it, light up every island
 async function grandFinale() {
   await fade(true); ['#hud', '#actions', '#dpad', '#promo', '#buildBar', '#panel', '#mapUI'].forEach(s2 => show(s2, false));
-  buildOverworld(); setMode('map'); mapCam(); player.g.visible = false;
+  buildOverworld(); setMode('map'); mapCam();
   const last = ISL.length - 1, P = ISL[last].pos.clone(); ISL.forEach((s2, i) => { s2.flame.visible = i < last; s2.lock.visible = false; setSign(i, 'done'); setBridge(i, true); });
   const g = new THREE.Group(); g.position.copy(P).add(new THREE.Vector3(0, 0, -0.6)); overworld.add(g);
+  player.g.visible = true; player.queue = []; player.moving = false; player.g.position.copy(P).add(new THREE.Vector3(1.5, 0, 1.2)); player.face = 0; player.g.rotation.y = 0;
   mesh('stone', 0, 0.4, 0, 1.6, 0.8, 1.6, g); mesh('log', 0, 2.4, 0, 0.6, 3.4, 0.6, g); mesh(M.gold, 0, 4.2, 0, 1.8, 0.5, 1.8, g);
   const fire = new THREE.Group(); fire.position.y = 4.5; g.add(fire); fire.scale.setScalar(0.01);
   [['#ff4f1a', 1.5, 0.9], ['#ff8a1a', 1.1, 1.6], ['#ffd23f', 0.7, 2.2], ['#fff3b0', 0.35, 2.6]].forEach(([c, w, h]) => { const f = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: c })); f.scale.set(w, h, w); f.position.y = h / 2; f.rotation.y = w; fire.add(f); });
   const light = new THREE.PointLight('#ffb35a', 0, 80); light.position.set(0, 7, 0); g.add(light);
-  MC.follow = false; MC.target.copy(P).add(new THREE.Vector3(0, 3, 0)); const d0 = MC.dist; MC.dist = camera.aspect < 0.8 ? 18 : 13;
-  camera.position.copy(P).add(new THREE.Vector3(0, 40, 30));
+  MC.follow = false; MC.target.copy(P).add(new THREE.Vector3(0, 4.5, 0)); const d0 = MC.dist; MC.dist = camera.aspect < 0.8 ? 13 : 11;
+  camera.position.copy(P).add(new THREE.Vector3(0, 30, 24)); MC.look.copy(MC.target); // fly in from above
   const ov = document.createElement('div'); ov.id = 'finale'; ov.innerHTML = '<div class="fin-t">THE GREAT TORCH IS LIT! 🔥</div><div class="fin-s">You brought the light back to every island of Promethia ✨</div><div class="fin-tap">tap to continue</div>'; document.body.appendChild(ov);
   let skip; const skipP = new Promise(r => skip = r); ov.onclick = () => skip();
   const wait = ms => Promise.race([sleep(ms), skipP]);
-  await fade(false); await wait(1500);
+  ov.classList.add('top'); await fade(false); await wait(1600);
   Sound.sfx('fire'); shake(0.4); fire.scale.setScalar(0.01); tween(0.7, k => { fire.scale.setScalar(0.01 + k * 1.2); light.intensity = 8 * k; });
   for (let i = 0; i < 6; i++) setTimeout(() => burst(g.position.clone().add(new THREE.Vector3(rnd(-1, 1), 6 + rnd(0, 2), rnd(-1, 1))), pick(['#f26b21', '#ffd23f', '#ff4f1a', '#fff3b0']), 30, 5), i * 220);
   if (!(scene.background && scene.background.isColor)) scene.background = new THREE.Color('#7ec8ff'); const sky0 = scene.background.clone(), sky1 = new THREE.Color('#ffcf8a'); tween(1.5, k => { scene.background.copy(sky0).lerp(sky1, k); if (scene.fog) scene.fog.color.copy(scene.background); });
   ISL.forEach((s2, i) => setTimeout(() => { s2.flame.visible = true; burst(s2.flame.getWorldPosition(new THREE.Vector3()), '#ffd23f', 14, 2); }, 300 + i * 90));
-  setTimeout(() => { MC.dist = camera.aspect < 0.8 ? 46 : 36; MC.target.set(0, 0, camera.aspect < 0.8 ? 4 : 0); }, 900);
-  ov.classList.add('show'); Sound.sfx('win'); setTimeout(() => Sound.sfx('star'), 700); confetti(120); setTimeout(() => confetti(80), 1500);
-  window.__pqFinale = true; await wait(4600); ov.classList.add('out'); await sleep(400); ov.remove(); MC.dist = d0; MC.follow = true; fire.scale.setScalar(1.2);
+  ov.classList.add('show'); window.__pqTorchClose = true; await wait(2400); window.__pqTorchClose = false;
+  ov.classList.remove('top'); MC.dist = camera.aspect < 0.8 ? 46 : 36; MC.target.set(0, 0, camera.aspect < 0.8 ? 4 : 0); Sound.sfx('win'); setTimeout(() => Sound.sfx('star'), 700); confetti(120); setTimeout(() => confetti(80), 1500);
+  window.__pqFinale = true; await wait(2600); ov.classList.add('out'); await sleep(400); ov.remove(); MC.dist = d0; MC.follow = true; fire.scale.setScalar(1.2);
 }
 async function finishGame() {
   L.locked = true; ['#hud', '#actions', '#dpad', '#promo', '#buildBar'].forEach(s => show(s, false));
   const endT = Date.now(); try { await grandFinale(); } catch (e) { console.warn(e); document.getElementById('finale')?.remove(); }
   const { sc, firstTry, puzzles } = computeScores(); const title = titleFor(sc.total);
   const rec = {
-    id: 'PQ-' + Date.now().toString(36).toUpperCase(), test: TEST, name: S.student.name, school: S.student.school, band: S.band, grade: S.student.grade, section: S.student.section, pc: S.student.pc, hero: S.hero.name,
+    id: 'PQ-' + Date.now().toString(36).toUpperCase(), test: TEST, name: S.student.name, school: S.student.school, band: S.band, grade: S.student.grade, section: S.student.section, pc: S.student.pc, avatar: S.avatar, hero: S.hero.name,
     startedAt: S.startedAt, finishedAt: new Date(endT).toISOString(), totalSec: Math.round((endT - new Date(S.startedAt).getTime()) / 1000),
     levels: S.levels.map(l => l && ({ costStars: l.costStars, id: l.id, name: l.name, skill: l.skill, time: l.time, attempts: l.attempts, fails: l.fails, hints: l.hints, stars: l.stars, explore: l.explore, embers: l.embers, completed: l.completed, skipped: l.skipped, firstTry: l.firstTry })),
     build: S.build, speech: S.speech, boss: S.boss, voice: S.voice, tale: S.tale, invent: S.invent, stars: S.stars, embers: S.embers, scores: sc, firstTry, puzzles, title, sent: false,
@@ -1809,7 +1905,7 @@ async function finishGame() {
   const top = topBadges(rec.totalSec); rec.badges = top.map(x => `${x.e} ${x.n}`); rec.badgeIds = top.map(x => x.id); rec.islandStars = LEVELS.map((d, i) => islandStars(S.levels[i]));
   const a = getArchive(); a.push(rec); setArchive(a);
   // results screen
-  $('#badgeTitle').textContent = title; $('#resName').textContent = `${rec.name}, you are a`; window.__pqRec = rec;
+  $('#badgeTitle').textContent = title; $('#resName').textContent = `${rec.name}, you are a`; const ra = $('#resAv'); if (ra) ra.className = 'avfig ' + (S.avatar || 'boy'); window.__pqRec = rec;
   $('#resLine').textContent = `🏆 ${title}! 🏆`;
   $('#resBadges').innerHTML = top.map((x, i) => `<div class="b5" style="animation-delay:${0.3 + i * 0.15}s"><span class="be">${x.e}</span><b>${x.n}</b><small>${x.d}</small></div>`).join('');
   const mm = Math.floor(rec.totalSec / 60), ss = rec.totalSec % 60;
@@ -1839,13 +1935,21 @@ const STORY = [
 ];
 $('#startForm').addEventListener('submit', async e => {
   e.preventDefault(); Sound.init();
+  if (!S.avatar) { show('#avErr', true); document.querySelector('.avpick').classList.add('shake'); setTimeout(() => document.querySelector('.avpick').classList.remove('shake'), 500); return; }
   S.student = { name: $('#fName').value.trim(), school: ($('#fSchool') ? $('#fSchool').value.trim() : '') || CFG.SCHOOL || '', grade: $('#fGrade').value, section: $('#fSection').value.trim().toUpperCase(), pc: $('#fPC').value.trim() };
   if (!S.student.name) return; S.band = bandFor(S.student.grade);
   show('#start', false); show('#story');
   let i = 0; const step = () => { $('#storyArt').textContent = STORY[i][0]; $('#storyText').innerHTML = STORY[i][1]; Sound.sfx('click'); };
   step(); $('#storyNext').onclick = () => { i++; if (i < STORY.length) step(); else { show('#story', false); pickHero(); } };
 });
-function pickHero() {
+document.querySelectorAll('.av').forEach(b => b.onclick = () => { document.querySelectorAll('.av').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); S.avatar = b.dataset.av; show('#avErr', false); Sound.init(); Sound.sfx('click'); });
+async function pickHero() {
+  // the avatar picked on the form is the hero everywhere (map, levels, golem, finale, results)
+  S.hero = AVATARS[S.avatar] || AVATARS.boy; buildPlayer(S.hero); S.startedAt = new Date().toISOString();
+  if (DEBUG && QS.get('level')) return startLevel(Math.max(0, Math.min(LEVELS.length - 1, (+QS.get('level')) - 1)));
+  await earthZoom(); await showMap(-1, 0, true); startLevel(0);
+}
+function pickHeroOld() {
   show('#heroPick'); const box = $('#heroes');
   box.innerHTML = HEROES.map(h => `<button class="choice" data-id="${h.id}"><div class="sw" style="background:linear-gradient(${h.hair} 0 25%,${h.skin} 25% 50%,${h.shirt} 50% 80%,${h.pants} 80%)"></div>${h.name}</button>`).join('');
   box.querySelectorAll('.choice').forEach(b => b.onclick = () => { box.querySelectorAll('.choice').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); S.hero = HEROES.find(h => h.id === b.dataset.id); $('#heroGo').disabled = false; Sound.sfx('click'); });

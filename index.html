@@ -6,7 +6,7 @@
 <title>Promethia Quest: Relight the Great Torch</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="assets/favicon-32.png">
-<link rel="stylesheet" href="style.css?v=p1fix1">
+<link rel="stylesheet" href="style.css?v=v4a">
 </head>
 <body>
 <canvas id="c"></canvas>
@@ -69,7 +69,7 @@
   <div class="card">
     <img src="assets/promo.webp" class="promo-big" alt="Promo">
     <h1>Promethia <span>Quest</span></h1>
-    <p class="tag">Relight the Great Torch! · 14 islands</p>
+    <p class="tag">Relight the Great Torch! · 15 islands</p>
     <form id="startForm" autocomplete="off">
       <label>Your name<input id="fName" required maxlength="40" placeholder="First and last name"></label>
       <label>School<input id="fSchool" maxlength="60" placeholder="School name"></label>
@@ -78,6 +78,10 @@
         <label>Section<input id="fSection" maxlength="6" placeholder="A"></label>
         <label>Lab PC #<input id="fPC" maxlength="8" placeholder="12"></label>
       </div>
+      <div class="avpick"><span class="avq">Choose your hero</span>
+        <button type="button" class="av" data-av="boy"><span class="avfig boy"><i class="h"></i><i class="f"></i><i class="b"></i><i class="l"></i></span><b>Boy</b></button>
+        <button type="button" class="av" data-av="girl"><span class="avfig girl"><i class="h"></i><i class="p"></i><i class="f"></i><i class="b"></i><i class="l"></i></span><b>Girl</b></button>
+      </div><p id="avErr" class="small hidden" style="color:#c62828;font-weight:800">Please choose Boy or Girl 👆</p>
       <button class="btn primary" type="submit">Play ▶</button>
     </form>
     <p class="small">🎮 Arrow keys / W A S D or tap · About 20 minutes</p>
@@ -112,7 +116,7 @@
 <div id="results" class="screen hidden">
   <div class="card results">
     <div class="res-top"><div class="badge" id="badge"><img src="assets/logo-mark.png" alt=""><div id="badgeTitle">Torchbearer</div></div>
-      <div class="res-head"><h2 id="resName"></h2><p id="resLine" class="tag"></p><div id="resStats" class="stats"></div></div></div>
+      <span id="resAv" class="avfig"><i class="h"></i><i class="p"></i><i class="f"></i><i class="b"></i><i class="l"></i></span><div class="res-head"><h2 id="resName"></h2><p id="resLine" class="tag"></p><div id="resStats" class="stats"></div></div></div>
     <h3>🏅 My 5 badges</h3><div id="resBadges" class="badges5"></div>
     <h3>📊 My skills</h3><div id="resBars" class="bars"></div>
     <h3>🏝️ My islands</h3><div id="resIslands" class="isl"></div>
@@ -123,6 +127,6 @@
 
 <div id="fade"></div>
 <script src="config.js"></script>
-<script type="module" src="game.js?v=p1fix1"></script>
+<script type="module" src="game.js?v=v4a"></script>
 </body>
 </html>
