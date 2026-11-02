@@ -87,7 +87,7 @@ const Sound = {
 
 /* ================= RENDERER ================= */
 const canvas = $('#c');
-let quality = localStorage.getItem(QUALITY_KEY) || 'high';
+let quality = localStorage.getItem(QUALITY_KEY) || (((navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4 || Math.min(screen.width, screen.height) < 500) ? 'low' : 'high');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: quality === 'high', powerPreference: 'default' });
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
@@ -433,7 +433,7 @@ function ambTick(dt, t) {
 }
 
 /* ================= SPACE + EARTH ================= */
-let MODE = 'space';
+let MODE = 'space'; const FPS = { n: 0, t: -3 };
 const space = new THREE.Group(); scene.add(space);
 const earthTex = (() => {
   const W = 256, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
@@ -476,9 +476,12 @@ function buildOverworld() {
     for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { const d = Math.hypot(dx, dz); if (d > 1.5) continue; top.push([dx, -0.5, dz]); for (let k = 1; k < 3.6 - d; k++) (k > 2 ? stone : dirt).push([dx * (1 - k * 0.1), -0.5 - k, dz * (1 - k * 0.1)]); }
     instBlocks(top, 'grass', g); instBlocks(dirt, 'dirt', g); if (stone.length) instBlocks(stone, 'stone', g);
     if (i % 3 === 1) { const tr = addTree(1, -1, 2, g); tr.scale.setScalar(0.45); }
-    const def = LEVELS[i]; const sign = cardSprite(def.emoji, String(i + 1), 1.4); sign.position.set(0, 2.6, -0.4); g.add(sign);
+    const def = LEVELS[i]; const sign = new THREE.Sprite(new THREE.SpriteMaterial({ map: signTex(i, 'locked'), depthWrite: false, transparent: true })); sign.scale.set(2.3, 2.3, 1); sign.position.set(0, 2.9, -0.4); g.add(sign);
+    mesh('log', 0, 0.9, -0.55, 0.16, 1.8, 0.16, g);
+    const fcols = ['#ff4f8b', '#ffd23f', '#4fc3ff', '#b46bff', '#ff7a1a']; for (let k = 0; k < 4; k++) { const a = i * 2.3 + k * 1.7, r = 1.0 + (k % 2) * 0.35; const fl = new THREE.Mesh(BOX, new THREE.MeshLambertMaterial({ color: fcols[(i + k) % 5] })); fl.scale.set(0.22, 0.22, 0.22); fl.position.set(Math.cos(a) * r, 0.14, Math.sin(a) * r); g.add(fl); const st = mesh('leaves', Math.cos(a) * r, 0.02, Math.sin(a) * r, 0.08, 0.1, 0.08, g); }
+    if (i % 3 !== 1) { const rk = mesh('stone', 1.3, 0.15, -0.9, 0.5, 0.3, 0.4, g); } if (i % 2 === 0) { const mu = mesh(new THREE.MeshLambertMaterial({ color: '#e53935' }), -1.2, 0.3, -1.0, 0.36, 0.14, 0.36, g); mesh(new THREE.MeshLambertMaterial({ color: '#fff6ec' }), -1.2, 0.12, -1.0, 0.12, 0.24, 0.12, g); }
     const pole = mesh('log', -1, 0.6, 0.9, 0.18, 1.2, 0.18, g); const flame = new THREE.Group(); [['#ff7a1a', 0.34, 0], ['#ffd23f', 0.2, 0.12]].forEach(([c, sz, y]) => { const f = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: c })); f.scale.set(sz, sz * 1.4, sz); f.position.y = y; flame.add(f); }); flame.position.set(-1, 1.4, 0.9); flame.visible = false; g.add(flame);
-    const lock = sprite('🔒', 0.9); lock.position.set(0, 1.5, 0); g.add(lock);
+    const lock = sprite('🔒', 0.9); lock.position.set(0, 1.5, 0); lock.visible = false; g.add(lock);
     g.userData.bob = i; ISL.push({ pos, g, flame, lock, sign, bridge: null });
   }
   for (let i = 0; i < N - 1; i++) {
@@ -491,6 +494,20 @@ function buildOverworld() {
   }
   for (let i = 0; i < 18; i++) { const g = new THREE.Group(); const n = 3 + (Math.random() * 3 | 0); for (let j = 0; j < n; j++) { const c = new THREE.Mesh(BOX, M.cloud); c.scale.set(rnd(2, 4), 1, rnd(1.5, 3)); c.position.set(j * 1.8 - n, 0, rnd(-0.8, 0.8)); g.add(c); } g.position.set(rnd(-40, 40), rnd(-9, -4), rnd(-30, 25)); g.userData.v = rnd(0.2, 0.6); overworld.add(g); }
 }
+const signCache = {};
+function signTex(i, state) {
+  const k = i + state; if (signCache[k]) return signCache[k]; const d = LEVELS[i];
+  const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+  const col = { locked: ['#8a93a6', '#5b6478'], now: ['#f26b21', '#1a2a4f'], done: ['#2fa86b', '#1a2a4f'] }[state];
+  g.fillStyle = '#0004'; g.beginPath(); g.arc(132, 136, 110, 0, 7); g.fill();
+  g.fillStyle = col[0]; g.beginPath(); g.arc(128, 128, 110, 0, 7); g.fill(); g.lineWidth = 14; g.strokeStyle = state === 'now' ? '#ffd23f' : '#fff6ec'; g.stroke();
+  g.fillStyle = '#fff6ec'; g.beginPath(); g.arc(128, 150, 70, 0, 7); g.fill();
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '900 96px system-ui,sans-serif'; g.fillStyle = col[1]; g.fillText(String(i + 1), 128, 154);
+  g.font = '54px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.fillText(state === 'locked' ? '🔒' : d.emoji, 128, 54);
+  if (state === 'done') { g.fillStyle = '#2fa86b'; g.beginPath(); g.arc(205, 205, 40, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 8; g.stroke(); g.font = '900 52px system-ui'; g.fillStyle = '#fff'; g.fillText('✓', 205, 208); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return signCache[k] = t;
+}
+function setSign(i, state) { const s2 = ISL[i].sign; s2.material.map = signTex(i, state); s2.material.needsUpdate = true; s2.userData.now = state === 'now'; s2.scale.setScalar(state === 'now' ? 2.7 : 2.2); }
 function setBridge(i, on) { const b = ISL[i] && ISL[i].bridge; if (!b) return; b.built = on; b.planks.forEach(p => { p.pl.visible = on; p.gh.visible = !on; }); }
 const MC = { target: new THREE.Vector3(), look: new THREE.Vector3(), dist: 30, follow: true };
 function mapCam() {
@@ -504,35 +521,38 @@ async function showMap(from, to, first) {
   await fade(true);
   ['#hud', '#actions', '#dpad', '#promo', '#buildBar', '#panel'].forEach(s2 => show(s2, false));
   buildOverworld(); setMode('map'); mapCam();
-  ISL.forEach((s2, i) => { s2.flame.visible = i < (from >= 0 ? from : to); s2.lock.visible = i > to || (i === to && from >= 0 && from < to); s2.sign.material.opacity = i <= to ? 1 : 0.55; s2.sign.material.transparent = true; setBridge(i, i < to - 1 || (i < to && !(from >= 0 && from < to))); });
+  ISL.forEach((s2, i) => { s2.flame.visible = i < (from >= 0 ? from : to); s2.lock.visible = false; setSign(i, i < to ? 'done' : (i === to && !(from >= 0 && from < to)) ? 'now' : 'locked'); setBridge(i, i < to - 1 || (i < to && !(from >= 0 && from < to))); });
   const startI = from >= 0 ? from : to; player.g.visible = true; player.queue = []; player.moving = false;
   player.g.position.copy(islandSpot(startI)); player.face = 0;
   if (first) { camera.position.set(0, 140, 60); MC.look.set(0, 0, 0); player.g.position.y += 10; } else camera.position.copy(player.g.position.clone().add(new THREE.Vector3(0, 26, 20)));
-  renderMapUI(to, true);
+  mapSkip = false; renderMapUI(to, true);
   await fade(false);
-  if (first) { const y0 = player.g.position.y, y1 = islandSpot(to).y; await sleep(900); await new Promise(r => tween(0.9, k => player.g.position.y = y0 + (y1 - y0) * (k * k), r)); burst(player.g.position.clone().setY(y1 + 0.1), '#ffffff', 14, 1.5); Sound.sfx('place'); }
+  if (first) { const y0 = player.g.position.y, y1 = islandSpot(to).y; await msleep(500); await new Promise(r => tween(0.6, k => player.g.position.y = y0 + (y1 - y0) * (k * k), r)); burst(player.g.position.clone().setY(y1 + 0.1), '#ffffff', 14, 1.5); Sound.sfx('place'); }
   if (from >= 0 && from < to) {
-    const f = ISL[from].flame; f.visible = true; burst(f.getWorldPosition(new THREE.Vector3()), '#ffb02e', 18, 2); Sound.sfx('collect'); await sleep(500);
+    const f = ISL[from].flame; f.visible = true; burst(f.getWorldPosition(new THREE.Vector3()), '#ffb02e', 18, 2); Sound.sfx('collect'); setSign(from, 'done'); await msleep(200);
     const br = ISL[from].bridge;
-    for (const p of br.planks) { p.gh.visible = false; p.pl.visible = true; p.pl.scale.y = 0.01; const pl = p.pl; tween(0.2, k => pl.scale.y = 0.01 + 0.11 * k); Sound.sfx('place'); burst(pl.position, '#ffd23f', 3, 1); await sleep(140); }
-    br.built = true; await sleep(250);
+    for (const p of br.planks) { p.gh.visible = false; p.pl.visible = true; p.pl.scale.y = 0.01; const pl = p.pl, y0 = pl.position.y; if (mapSkip) { pl.scale.y = 0.12; continue; } tween(0.18, k => { pl.scale.y = 0.01 + 0.11 * k; pl.position.y = y0 + (1 - k) * 1.2; }); Sound.tone(500 + br.planks.indexOf(p) * 70, 0.06, 'square', 0.1); burst(pl.position, '#ffd23f', 4, 1.2); await msleep(Math.min(90, 520 / br.planks.length)); }
+    br.built = true; await msleep(120);
     const pts = [islandSpot(from), ...br.planks.map(p => p.pl.position.clone().setY(p.pl.position.y + 0.06)), islandSpot(to)];
     player.moving = true;
-    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k]; player.face = Math.atan2(b.x - a.x, b.z - a.z); const d = a.distanceTo(b); await new Promise(r => tween(d * 0.16, kk => { player.g.position.lerpVectors(a, b, kk); player.g.position.y += Math.sin(kk * Math.PI) * 0.1; }, r)); }
-    player.moving = false; player.face = 0;
-    const lk = ISL[to].lock; burst(lk.getWorldPosition(new THREE.Vector3()), '#ffd23f', 16, 2); Sound.sfx('good'); tween(0.4, k => { lk.position.y = 1.5 + k * 2; lk.material.opacity = 1 - k; }, () => { lk.visible = false; lk.position.y = 1.5; lk.material.opacity = 1; });
+    for (let k = 1; k < pts.length; k++) { const a = pts[k - 1], b = pts[k]; player.face = Math.atan2(b.x - a.x, b.z - a.z); const d = a.distanceTo(b); if (mapSkip) continue; await new Promise(r => tween(d * 0.07, kk => { player.g.position.lerpVectors(a, b, kk); player.g.position.y += Math.sin(kk * Math.PI) * 0.1; }, r)); }
+    player.moving = false; player.face = 0; player.g.position.copy(islandSpot(to)); setSign(to, 'now'); tween(0.4, k => ISL[to].sign.scale.setScalar(2.7 + Math.sin(k * Math.PI) * 0.8));
+    const lk = ISL[to].lock; lk.visible = true; burst(lk.getWorldPosition(new THREE.Vector3()), '#ffd23f', 16, 2); Sound.sfx('good'); tween(0.4, k => { lk.position.y = 1.5 + k * 2; lk.material.opacity = 1 - k; }, () => { lk.visible = false; lk.position.y = 1.5; lk.material.opacity = 1; });
     player.jumpT = 0.5;
   }
   renderMapUI(to, false);
   await new Promise(r => { mapGoResolve = r; if (window.__pqAutoMap) setTimeout(() => $('#mapGo').click(), 300); });
 }
+let mapSkip = false;
+function msleep(ms) { return new Promise(r => { if (mapSkip) return r(); const t0 = now(); const iv = setInterval(() => { if (mapSkip || now() - t0 >= ms / 1000) { clearInterval(iv); r(); } }, 16); }); }
 function renderMapUI(to, busy) {
-  const d = LEVELS[to]; show('#mapUI');
-  $('#mapTitle').innerHTML = `Island ${to + 1} of ${LEVELS.length}: ${d.emoji} ${d.name}`; $('#mapSub').textContent = d.skillLabel || '';
+  const d = LEVELS[to]; show('#mapUI'); const mc = $('#mapUI .map-card'); mc.classList.toggle('busy', busy);
+  if (busy) { mc.classList.remove('reveal'); mc.offsetHeight; mc.classList.add('reveal'); }
+  $('#mapTitle').innerHTML = `<span class="mnum">${to + 1}</span><span class="mname"><small>Island ${to + 1} of ${LEVELS.length}</small>${d.emoji} ${d.name}</span>`; $('#mapSub').textContent = d.skillLabel || '';
   $('#mapDots').innerHTML = LEVELS.map((l, i) => `<i class="${i < to ? 'done' : i === to ? 'now' : ''}">${i < to ? '✓' : i + 1}</i>`).join('');
-  $('#mapGo').disabled = busy; $('#mapGo').textContent = busy ? 'Building the bridge…' : `Play island ${to + 1} ▶`;
+  $('#mapGo').disabled = false; $('#mapGo').textContent = busy ? 'Tap to skip ⏩' : `▶ Play island ${to + 1}!`; $('#mapGo').classList.toggle('ready', !busy);
 }
-$('#mapGo').onclick = () => { if (!mapGoResolve) return; Sound.sfx('click'); show('#mapUI', false); const r = mapGoResolve; mapGoResolve = null; r(); };
+$('#mapGo').onclick = () => { if (!mapGoResolve) { mapSkip = true; return; } Sound.sfx('click'); show('#mapUI', false); const r = mapGoResolve; mapGoResolve = null; r(); };
 async function earthZoom() {
   setMode('space'); SC.zoom = false; const far = camera.aspect < 0.8 ? 1.6 : 1;
   const p0 = SC.pos.clone().multiplyScalar(far), l0 = SC.look.clone(); SC.zoom = true; SC.pos.copy(p0);
@@ -543,7 +563,7 @@ async function earthZoom() {
 }
 
 /* ================= STATE + UI ================= */
-const S = { student: null, hero: null, startedAt: null, idx: 0, embers: 0, stars: 0, levels: [], build: null, speech: null, boss: null, promoTaps: 0 };
+const S = { band: '5-6', student: null, hero: null, startedAt: null, idx: 0, embers: 0, stars: 0, levels: [], build: null, speech: null, boss: null, promoTaps: 0 };
 let promoTimer = null;
 function say(text, ms) { const p = $('#promo'); p.classList.remove('hidden'); $('#promoText').innerHTML = text; clearTimeout(promoTimer); if (ms) promoTimer = setTimeout(() => L && L.goalText && ($('#promoText').innerHTML = L.goalText), ms); }
 function hud() {
@@ -558,9 +578,12 @@ function fade(on) { $('#fade').classList.toggle('on', on); return sleep(380); }
 function show(id, on = true) { $(id).classList.toggle('hidden', !on); }
 
 /* ================= LEVEL FLOW ================= */
+function bandFor(grade) { return (+grade >= 7) ? '7-8' : '5-6'; }
+// Per-track content: a level may define tracks: { '5-6': {...}, '7-8': {...} }; overrides are layered over the base level.
+function trackDef(base) { const o = base.tracks && base.tracks[S.band]; return o ? Object.assign(Object.create(base), o) : base; }
 function newRec(def) { return { id: def.id, name: def.name, skill: def.skill, t0: now(), time: 0, attempts: 1, fails: 0, hints: 0, stars: 0, explore: 0, embers: 0, steps: 0, completed: false, skipped: false, firstTry: true, extra: {} }; }
 async function startLevel(i) {
-  S.idx = i; const def = LEVELS[i];
+  S.idx = i; const def = trackDef(LEVELS[i]);
   await fade(true); show('#mapUI', false);
   ['#btnHint', '#btnSkip', '#btnReset', '#btnAct', '#buildBar', '#hearts', '#panel'].forEach(s => show(s, false)); $('#btnAct').onclick = null;
   setMode('level'); player.g.position.y = 0;
@@ -603,14 +626,18 @@ function giveHint() {
   const h = getHints(); if (!h.length) return; L.rec.hints++; L.rec.firstTry = false; Sound.sfx('click');
   say('💡 ' + h[Math.min(L.hintIdx, h.length - 1)], 7000); L.hintIdx++;
 }
-async function skipLevel() {
-  const ok = await modal(`<h2>Skip this level?</h2><p class="story-text">That's OK! You can move on.</p><button class="btn" data-v="0" style="background:#ddd;color:#1a2a4f">Keep trying</button> <button class="btn primary" data-v="1">Skip →</button>`, (el, done) => el.querySelectorAll('button').forEach(b => b.onclick = () => done(b.dataset.v === '1')));
+async function skipLevel(offer) {
+  const ok = await modal(`<h2>${offer ? 'Great effort! 💪' : 'Skip this level?'}</h2><p class="story-text">${offer ? 'You have tried for a while. Keep trying, or move on to the next island?' : "That's OK! You can move on."}</p><button class="btn" data-v="0" style="background:#ddd;color:#1a2a4f">Keep trying</button> <button class="btn primary" data-v="1">Skip →</button>`, (el, done) => el.querySelectorAll('button').forEach(b => b.onclick = () => done(b.dataset.v === '1')));
   if (ok) { L.rec.skipped = true; completeLevel(); }
 }
 function checkHelpers() {
   if (!L || L.done) return; const t = now() - L.rec.t0, f = L.rec.fails;
   if (getHints().length && (t > (CFG.HINT_AFTER_SEC || 45) || f >= (CFG.HINT_AFTER_FAILS || 2))) show('#btnHint', true);
-  if (!L.def.noSkip && (t > (CFG.SKIP_AFTER_SEC || 150) || f >= (CFG.SKIP_AFTER_FAILS || 4))) show('#btnSkip', true);
+  const hard = S.idx >= LEVELS.length - 3, tut = S.idx === 0;
+  if ((!L.def.noSkip || (!tut && !L.def.ownTimer)) && (t > (CFG.SKIP_AFTER_SEC || (hard ? 120 : 75)) || f >= (CFG.SKIP_AFTER_FAILS || 3))) show('#btnSkip', true);
+  // time budget: after a long time, Promo offers to move on (once per level)
+  if (!tut && !L.def.ownTimer && !L.offered && !L.locked && !(TEST && !QS.get('offer')) && t > (hard ? 180 : 120)) { L.offered = true; L.rec.extra.offeredSkip = 1; skipLevel(true); }
+  const tt = $('#totalTime'); if (tt && S.startedAt) { const sec = Math.round((Date.now() - new Date(S.startedAt).getTime()) / 1000); tt.textContent = `⏱️ ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
 }
 
 /* ================= INPUT ================= */
@@ -633,7 +660,7 @@ document.querySelectorAll('#dpad button').forEach(b => {
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 let marker = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.42, 20), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.9, depthWrite: false })); marker.rotation.x = -Math.PI / 2; marker.visible = false; scene.add(marker);
 canvas.addEventListener('pointerdown', e => {
-  Sound.init(); if (!L || L.locked) return;
+  Sound.init(); if (MODE === 'map') { $('#mapGo').click(); return; } if (!L || L.locked) return;
   ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
   if (L.def.onPointer && L.def.onPointer(L, ray)) return;
   const p = new THREE.Vector3(); if (!ray.ray.intersectPlane(plane, p)) return;
@@ -669,6 +696,8 @@ function loop(t) {
     for (const d of ['up', 'down', 'left', 'right']) if (keys.has(d)) { tryStep(...DIRS[d]); moved = true; break; }
     if (!moved && player.queue.length) { const [nx, nz] = player.queue.shift(); if (!tryStep(nx - player.x, nz - player.z)) player.queue = []; }
   }
+  // auto-fallback to Fast graphics on slow devices (only if the player never chose a setting)
+  if (quality === 'high' && !localStorage.getItem(QUALITY_KEY) && !TEST) { FPS.n++; FPS.t += dt; if (FPS.t > 6) { if (FPS.n / FPS.t < 24) { quality = 'low'; applyQuality(); say('Switched to Fast graphics ⚡ for smoother play', 2500); } FPS.n = 0; FPS.t = -1e9; } }
   // player anim (walk / idle / jump)
   const P = player.parts; if (P.legL) {
     player.walkT += dt * (player.moving ? 14 : 0); const s = player.moving ? Math.sin(player.walkT) * 0.6 : 0; const idle = player.moving ? 0 : Math.sin(t / 650) * 0.07;
@@ -957,6 +986,166 @@ NEW.N6 = {
   update(L, dt, t) { bob(t); if (L.show) L.show.position.y = 2.8 + Math.sin(t / 300) * 0.15; },
 };
 
+/* ---------- W1 Word Turtle (spelling, medium) ---------- */
+NEW.W1 = {
+  id: 'W1', name: 'Word Turtle', emoji: '🐢', skill: 'words', skillLabel: 'Word Power',
+  map: ['###########', '#.1.2.3.4.#', '#.........#', '#.5.6.7.8.#', '#.........#', '#x...S...*#', '#####E#####'],
+  words: [['☀️', 'SUN'], ['🪁', 'KITE'], ['🥭', 'MANGO']],
+  tracks: { '7-8': { words: [['🌧️', 'RAIN'], ['🌱', 'PLANT'], ['🧲', 'MAGNET']] } },
+  intro: 'Help Tutu the turtle 🐢 spell the word! Walk onto the letters in order.',
+  goal: 'Spell the word: walk onto each letter in order',
+  hints: L => [`Look at the word card. Which letter comes first? 👀`, 'Say the word slowly. Listen to each sound 👂', 'Gold squares are letters you already used ✨'],
+  setup(L) { L.round = 0; L.good = 0; L.bad = 0; L.pads = []; for (const row of grid) for (const c of row) if (/[1-8]/.test(c.t)) { addPad(c); L.pads.push(c); }
+    const t = sprite('🐢', 1.2); t.position.set(wx(5), 1.2, wz(0) + 0.6); world.add(t); L.turtle = t; this.showRound(L); },
+  showRound(L) {
+    const [em, w] = this.words[L.round]; L.word = w; L.pos = 0; const pool = 'ABCDEFGHIJKLMNOPRSTUVWY'.split('').filter(ch => !w.includes(ch));
+    const letters = shuffle([...w.split(''), ...shuffle(pool).slice(0, 8 - w.length)]);
+    L.pads.forEach((c, i) => { c.letter = letters[i]; c.used = false; c.trigger = true; c.padObj.material = M.pad; if (c.card) world.remove(c.card); c.card = cardSprite(c.letter, '', 0.95); c.card.position.set(wx(c.x), 1.0, wz(c.z)); world.add(c.card); });
+    this.render(L); say(L.round ? `Next word! ${em} Spell ${w}` : this.intro, 0);
+  },
+  render(L) { const [em, w] = this.words[L.round]; panel(`<div class="pbig">${em} <span class="spell">${w.split('').map((ch, i) => `<b class="${i < L.pos ? 'ok' : i === L.pos ? 'now' : ''}">${i < L.pos ? ch : ch}</b>`).join('')}</span></div><div class="small2">Word ${L.round + 1} of ${this.words.length}</div>`); },
+  onEnter(c) {
+    if (!c.letter || c.used || L.round >= this.words.length) return;
+    if (c.letter === L.word[L.pos]) {
+      c.used = true; c.padObj.material = M.gold; L.pos++; L.good++; Sound.tone(500 + L.pos * 90, 0.12, 'triangle', 0.2); burst(c.card.position, '#2fa86b', 12); tween(0.35, k => c.card.scale.setScalar(0.95 + Math.sin(k * Math.PI) * 0.4));
+      this.render(L);
+      if (L.pos >= L.word.length) { Sound.sfx('good'); confetti(30); tween(0.8, k => { L.turtle.position.y = 1.2 + Math.sin(k * Math.PI) * 0.8; }); L.round++;
+        if (L.round >= this.words.length) { S.voice = { good: L.good, miss: L.bad, ratio: Math.round(100 * L.good / (L.good + L.bad)) / 100, kind: 'spelling' }; L.rec.extra = { ...S.voice }; L.pads.forEach(p => p.trigger = false); openGate(); say('Tutu is so happy! 🐢🎉 Walk to the gate ⬇️'); }
+        else { L.locked = true; say(`You spelled ${L.word}! 🎉`, 1500); setTimeout(() => { this.showRound(L); backToStart(0); }, 1100); } }
+      else say(`Good! Now find letter ${L.pos + 1} ➜`, 0);
+    } else { L.bad++; if (L.bad % 3 === 0) { L.rec.fails++; L.rec.firstTry = false; } Sound.sfx('bump'); shake(0.05); say('Not that one. Look at the word card again 👀', 2200); }
+  },
+  update(L, dt, t) { bob(t); L.pads.forEach((c, i) => { if (c.card && !c.used) c.card.position.y = 1.0 + Math.sin(t / 350 + i) * 0.06; }); },
+};
+
+/* ---------- P1 Picture Puzzle Fort (jigsaw, medium) ---------- */
+NEW.P1 = {
+  id: 'P1', name: 'Picture Puzzle Fort', emoji: '🧩', skill: 'logic', skillLabel: 'Puzzles', noWalk: true,
+  map: ['#########', '#.......#', '#...F...#', '#.......#', '#...S...#', '####E####'],
+  puzzles: [{ c: 3, r: 2, time: 75, art: ['🏰', '☀️', '🌳'] }, { c: 3, r: 3, time: 100, art: ['🛺', '🌴', '🪁'] }],
+  tracks: { '7-8': { puzzles: [{ c: 3, r: 3, time: 75, art: ['🏰', '☀️', '🌳'] }, { c: 4, r: 3, time: 100, art: ['🛺', '🌴', '🪁'] }] } },
+  intro: 'The fort picture is all mixed up! 🧩 Tap two pieces to swap them.',
+  goal: 'Fix the picture: tap 2 pieces to swap',
+  hints: ['Find the corners first. Look at the sky and the ground 👀', 'Tap one piece, then tap where it should go 🔄'],
+  solid: c => c.t === 'F',
+  setup(L) { for (const row of grid) for (const c of row) if (c.t === 'F') { mesh('brick', wx(c.x), 0.7, wz(c.z), 1.6, 1.4, 1.2); mesh(M.gold, wx(c.x), 1.5, wz(c.z), 0.3, 0.3, 0.3); L.fort = c; } L.results = []; },
+  art(p) { const c = document.createElement('canvas'); c.width = 360; c.height = 360 * p.r / p.c; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, c.height); gr.addColorStop(0, '#6ec6ff'); gr.addColorStop(0.62, '#bfe9ff'); gr.addColorStop(0.62, '#5cb85c'); gr.addColorStop(1, '#3f8f35'); g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height);
+    g.font = '96px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(p.art[0], c.width * 0.5, c.height * 0.55); g.font = '60px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.fillText(p.art[1], c.width * 0.85, c.height * 0.18); g.fillText(p.art[2], c.width * 0.15, c.height * 0.7); return c.toDataURL(); },
+  async start(L) {
+    for (let i = 0; i < this.puzzles.length; i++) {
+      const p = this.puzzles[i], n = p.c * p.r, url = this.art(p); let ord; do ord = shuffle([...Array(n).keys()]); while (ord.every((v, k) => v === k));
+      say(i ? 'Puzzle 2! A bit bigger 🧩' : this.intro, 0); const t0 = now();
+      const res = await modal(`<h2>🧩 Puzzle ${i + 1} of ${this.puzzles.length}</h2><div class="jtop"><img src="${url}" class="jpeek" alt="the picture"><span id="jTime">⏱️ ${p.time}s</span></div><div id="jig" style="grid-template-columns:repeat(${p.c},1fr);aspect-ratio:${p.c}/${p.r}"></div><p class="small" id="jTip">Tap a piece, then tap another to swap.</p>`, (el, done) => {
+        const box = el.querySelector('#jig'); let sel = -1, fin = false;
+        const draw = () => { box.innerHTML = ord.map((v, k) => `<button class="jp ${k === sel ? 'sel' : ''} ${v === k ? 'ok' : ''}" data-k="${k}" data-v="${v}" style="background-image:url(${url});background-size:${p.c * 100}% ${p.r * 100}%;background-position:${(v % p.c) / (p.c - 1) * 100}% ${(Math.floor(v / p.c)) / (p.r - 1) * 100}%"></button>`).join('');
+          box.querySelectorAll('.jp').forEach(b => b.onclick = () => { if (fin) return; const k = +b.dataset.k; if (sel < 0) { sel = k; Sound.sfx('click'); } else { [ord[sel], ord[k]] = [ord[k], ord[sel]]; sel = -1; Sound.sfx(ord[k] === k ? 'good' : 'place'); if (ord.every((v, q) => v === q)) { fin = true; clearInterval(iv); Sound.sfx('win'); box.classList.add('done'); setTimeout(() => done(true), 900); } } draw(); }); };
+        const iv = setInterval(() => { const left = Math.max(0, Math.ceil(p.time - (now() - t0))); const e = el.querySelector('#jTime'); if (e) { e.textContent = `⏱️ ${left}s`; e.classList.toggle('low', left < 15); } if (left <= 0 && !fin) { fin = true; clearInterval(iv); ord = [...Array(n).keys()]; draw(); el.querySelector('#jTip').textContent = 'Time! Here is the picture. Well tried! 👏'; setTimeout(() => done(false), 1600); } }, 250);
+        draw();
+      });
+      L.results.push({ ok: res, sec: Math.round(now() - t0) }); if (!res) { L.rec.fails++; L.rec.firstTry = false; } else confetti(30);
+    }
+    L.rec.extra = { puzzles: L.results.map(r => `${r.ok ? 'solved' : 'time'} ${r.sec}s`).join('; ') };
+    Sound.sfx('cheer'); openGate(); L.noWalkDone = true; say('The fort picture is fixed! 🏰🎉', 0); await sleep(1200); completeLevel();
+  },
+};
+
+/* ---------- O1 One Line Path (logic, medium) ---------- */
+NEW.O1 = {
+  id: 'O1', name: 'One Line Path', emoji: '〰️', skill: 'logic', skillLabel: 'Logic',
+  map: ['###########', '#.........#', '#.........#', '#.........#', '#.........#', '#....S....#', '#####E#####'],
+  P: { a: [[4, 2, 3, 2], [4, 3]], b: [[4, 2, 3, 3], [4, 4]], c: [[3, 2, 4, 3], [3, 4]], ring: [[4, 2, 3, 3, 'hole'], [4, 4]], d: [[3, 1, 4, 4], [3, 4]] },
+  order: ['a', 'b', 'c'],
+  tracks: { '7-8': { order: ['b', 'ring', 'c', 'd'] } },
+  intro: 'Paint EVERY bright tile with one walk! 〰️ You cannot step on a tile twice.',
+  goal: 'Step on every bright tile once',
+  hints: ['Start at the edge and go row by row, like a snake 🐍', 'Do not leave a tile alone in a corner!', 'Stuck? It restarts by itself. Try a new way 🔄'],
+  solid: c => L && L.allowed && (!L.allowed.has(c.x + ',' + c.z) || L.vis.has(c.x + ',' + c.z)),
+  setup(L) { L.round = 0; L.grp = new THREE.Group(); world.add(L.grp); this.showRound(L); },
+  start(L) { this.place(L); },
+  showRound(L) {
+    const [[x0, z0, w, h, hole], st] = this.P[this.order[L.round]]; L.allowed = new Set(); L.vis = new Set(); L.tiles = {}; L.grp.clear(); L.st = st;
+    for (let z = 1; z <= 5; z++) for (let x = 1; x <= 9; x++) { const inR = x >= x0 && x < x0 + w && z >= z0 && z < z0 + h && !(hole && x === x0 + 1 && z === z0 + 1); const k = x + ',' + z;
+      if (inR) { L.allowed.add(k); L.tiles[k] = mesh(new THREE.MeshLambertMaterial({ color: '#4fc3ff', emissive: '#4fc3ff', emissiveIntensity: 0.25 }), wx(x), 0.04, wz(z), 0.9, 0.08, 0.9, L.grp); }
+      else mesh('leaves', wx(x), 0.3, wz(z), 0.9, 0.6, 0.9, L.grp); }
+    panel(`<div class="pbig">〰️ Path ${L.round + 1} of ${this.order.length} · tiles left: <b id="o1n">${L.allowed.size}</b></div>`);
+  },
+  place(L) { placePlayer(L.st[0], L.st[1]); this.visit(L, L.st[0], L.st[1]); },
+  visit(L, x, z) { const k = x + ',' + z; if (!L.allowed || !L.allowed.has(k) || L.vis.has(k)) return; L.vis.add(k); const t = L.tiles[k]; t.material = M.gold; tween(0.2, q => t.scale.y = 1 + Math.sin(q * Math.PI) * 3); Sound.tone(400 + L.vis.size * 40, 0.08, 'triangle', 0.15);
+    const left = L.allowed.size - L.vis.size; const e = $('#o1n'); if (e) e.textContent = left;
+    if (!left) { Sound.sfx('good'); confetti(25); L.round++; if (L.round >= this.order.length) { L.allowed = null; L.grp.clear(); openGate(); panel(`<div class="pbig">〰️ All paths done!</div>`); say('Super paths! 🎉 Walk to the gate ⬇️'); } else { L.locked = true; say('Path done! 🎉 Next one…', 1500); setTimeout(() => { this.showRound(L); this.place(L); L.locked = false; }, 900); } return; }
+    const free = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dz]) => { const q = (x + dx) + ',' + (z + dz); return L.allowed.has(q) && !L.vis.has(q); });
+    if (!free) { L.locked = true; failLevel('Stuck! 🙈 Some tiles are left. Let us try again.'); setTimeout(() => { this.showRound(L); this.place(L); L.locked = false; }, 1200); }
+  },
+  onEnter(c) { this.visit(L, c.x, c.z); },
+  update: (L, dt, t) => bob(t),
+};
+
+/* ---------- G1 Gadget Workshop (creativity + communication, medium) ---------- */
+NEW.G1 = {
+  id: 'G1', name: 'Gadget Workshop', emoji: '🛠️', skill: 'creativity', skillLabel: 'Invent & Explain', noSkip: true,
+  map: ['#########', '#.......#', '#...M...#', '#.......#', '#b..S..x#', '####E####'],
+  problem: ['🎒', 'Priya\'s school bag is SO heavy!', 'a lighter school bag'],
+  tracks: { '7-8': { problem: ['🚗', 'Every morning there is a big traffic jam outside school!', 'less traffic outside school'] } },
+  parts: [['🛞', 'wheels'], ['🎈', 'balloon'], ['🧲', 'magnet'], ['☀️', 'solar panel'], ['🤖', 'robot arm'], ['📱', 'phone app'], ['🔔', 'bell'], ['🪽', 'wings']],
+  intro: 'Gadget Workshop! 🛠️ Solve a problem with your own invention.',
+  goal: 'Invent a gadget and say how it helps',
+  hints: ['Any 2 parts are OK! Think: how could they help? 🤔', 'Start with "It helps by…" 💡'],
+  solid: c => c.t === 'M',
+  setup(L) { for (const row of grid) for (const c of row) if (c.t === 'M') { const g = new THREE.Group(); g.position.set(wx(c.x), 0, wz(c.z)); mesh('plank', 0, 0.45, 0, 1.6, 0.9, 1, g); mesh(M.gold, -0.4, 1.0, 0, 0.3, 0.2, 0.3, g); mesh(new THREE.MeshLambertMaterial({ color: '#f26b21', emissive: '#f26b21', emissiveIntensity: 0.5 }), 0.4, 1.05, 0, 0.2, 0.3, 0.2, g); world.add(g); L.bench = g; } },
+  async start(L) {
+    const [pe, pt, pgoal] = this.problem; const parts = shuffle(this.parts).slice(0, 6); say(this.intro, 0);
+    const chosen = await modal(`<h2>${pe} Problem!</h2><p class="story-text">${pt}<br>Pick <b>2 parts</b> for a gadget that gives ${pgoal}.</p><div class="choices">${parts.map(([e, t]) => `<button class="choice" data-t="${t}" data-e="${e}"><span class="em">${e}</span>${t}</button>`).join('')}</div><button class="btn primary" id="gp" disabled>Build it! 🛠️</button>`, (el, done) => {
+      const sel = []; el.querySelectorAll('.choice').forEach(b => b.onclick = () => { const i = sel.indexOf(b); if (i >= 0) { sel.splice(i, 1); b.classList.remove('sel'); } else { if (sel.length >= 2) sel.shift().classList.remove('sel'); sel.push(b); b.classList.add('sel'); } Sound.sfx('click'); el.querySelector('#gp').disabled = sel.length !== 2; });
+      el.querySelector('#gp').onclick = () => done(sel.map(b => [b.dataset.e, b.dataset.t]));
+    });
+    say(`${chosen[0][0]} + ${chosen[1][0]} … building! 🛠️`, 0); Sound.sfx('fire'); tween(1, k => { L.bench.rotation.y = Math.sin(k * 25) * 0.06; L.bench.scale.setScalar(1 + Math.sin(k * Math.PI) * 0.15); }); await sleep(1100); burst(L.bench.position.clone().setY(1.5), '#ffd23f', 24, 3); Sound.sfx('boom');
+    const ideas = [`It helps by ${pgoal === 'a lighter school bag' ? 'rolling the bag so Priya does not carry it' : 'telling cars where to wait'}.`, 'It helps because it is fast and easy to use.'];
+    const res = await modal(`<h2>${chosen[0][0]} + ${chosen[1][0]} = ✨</h2><input type="text" id="gName" maxlength="40" placeholder="Name your gadget (example: Bag Buddy)"><input type="text" id="gHow" maxlength="140" placeholder="How does it help? (one line)"><div id="gIdeas" class="choices hidden" style="margin-top:8px">${ideas.map(i => `<button class="choice" style="min-width:100%">${i}</button>`).join('')}</div><button class="btn" id="gHelp" style="background:#ddd;color:#1a2a4f">💡 Ideas</button> <button class="btn primary" id="gGo">Show the class 🎉</button>`, (el, done) => {
+      const n = el.querySelector('#gName'), h = el.querySelector('#gHow'); el.querySelector('#gHelp').onclick = () => el.querySelector('#gIdeas').classList.remove('hidden'); el.querySelectorAll('#gIdeas .choice').forEach(b => b.onclick = () => { h.value = b.textContent; });
+      el.querySelector('#gGo').onclick = () => { if (!words(n.value)) { n.style.borderColor = '#f26b21'; n.placeholder = 'Give it any name you like!'; return; } done({ name: n.value.trim(), how: h.value.trim() }); };
+    });
+    S.invent = { parts: chosen.map(c => c[1]), name: res.name, does: res.how, words: words(res.how), problem: pgoal };
+    S.tale = { who: 'gadget', where: pgoal, problem: pt, ending: res.how, words: words(res.how) + (words(res.how) ? 2 : 0) };
+    L.rec.extra = { ...S.invent };
+    const sp = cardSprite(chosen[0][0] + chosen[1][0], res.name.slice(0, 14), 1.4); sp.position.set(L.bench.position.x, 2.6, L.bench.position.z); world.add(sp); L.show = sp;
+    Sound.sfx('cheer'); confetti(50); openGate(); say(`The class loves the "${res.name.replace(/[<>&]/g, '')}"! 👏 Walk to the gate ⬇️`);
+  },
+  update(L, dt, t) { bob(t); if (L.show) L.show.position.y = 2.6 + Math.sin(t / 300) * 0.15; },
+};
+
+/* ---------- S1 Setu Builder + Truck Rescue (maths/planning, hard) ---------- */
+NEW.S1 = {
+  id: 'S1', name: 'Setu Builder', emoji: '🌉', skill: 'logic', skillLabel: 'Bridge + Truck Rescue', noWalk: true, ownTimer: true,
+  map: ['.............', '..zzzzzzzzz..', '..zzzzzzzzz..', '..zzzzzzzzz..', '.............'],
+  rounds: [{ gap: 5, planks: { 3: 1, 2: 2 } }, { gap: 7, planks: { 3: 1, 2: 3, 4: 1 } }, { gap: 8, planks: { 3: 2, 2: 2, 4: 1 } }],
+  tracks: { '7-8': { rounds: [{ gap: 7, planks: { 3: 1, 2: 3, 4: 1 } }, { gap: 8, planks: { 3: 2, 2: 1, 5: 1 } }, { gap: 9, planks: { 4: 1, 2: 3, 5: 1 } }] } },
+  intro: 'A truck full of mangoes 🥭🚚 is stuck! Build a setu (bridge) that fits the river EXACTLY.',
+  goal: 'Pick planks that add up to the river width',
+  hints: L => [`The river is ${L.R ? L.R.gap : ''} m wide. Which planks add up to that? ➕`, 'Too short and the truck falls. Too long will not fit! 📏', 'Try the biggest plank first, then fill the rest 🧠'],
+  setup(L) { L.round = 0; L.wins = 0; L.grp = new THREE.Group(); world.add(L.grp);
+    const w = new THREE.Mesh(BOX, M.water); w.scale.set(9, 0.1, 3); w.position.set((wx(2) + wx(10)) / 2, -0.4, wz(2)); world.add(w);
+    const t = new THREE.Group(); mesh(new THREE.MeshLambertMaterial({ color: '#f26b21' }), 0, 0.55, 0, 1.3, 0.6, 0.7, t); mesh(new THREE.MeshLambertMaterial({ color: '#1a2a4f' }), 0.8, 0.5, 0, 0.45, 0.5, 0.7, t); [[-0.4, 0.38], [0.4, 0.38], [-0.4, -0.38], [0.4, -0.38], [0.8, 0.38], [0.8, -0.38]].forEach(([x, z]) => mesh(M.dark, x, 0.18, z, 0.3, 0.3, 0.1, t)); const s2 = sprite('🥭', 0.5); s2.position.set(0, 1.1, 0); t.add(s2); world.add(t); L.truck = t; this.showRound(L); },
+  showRound(L) { const R = this.rounds[L.round]; L.R = R; L.left = { ...R.planks }; L.used = []; L.grp.clear(); L.ended = false; L.tLeft = 90;
+    for (let x = 2 + R.gap; x <= 10; x++) for (let z = 1; z <= 3; z++) { mesh(M.grass, wx(x), -0.5, wz(z), 1, 1, 1, L.grp); mesh('dirt', wx(x), -1.5, wz(z), 1, 1, 1, L.grp); }
+    const fl = sprite('🏁', 0.8); fl.position.set(wx(2 + R.gap) + 0.3, 1.2, wz(1)); L.grp.add(fl);
+    L.truck.position.set(wx(0.6), 0, wz(2)); L.truck.rotation.set(0, 0, 0); L.truck.visible = true; this.render(L);
+    say(L.round ? `Round ${L.round + 1}: the river is ${R.gap} m wide now 🌊` : this.intro, 0); },
+  render(L) { const R = L.R, sum = L.used.reduce((a, b) => a + b, 0);
+    panel(`<div class="bpanel"><b>🌉 Round ${L.round + 1}/${this.rounds.length}</b><span>River: <b>${R.gap} m</b></span><span>Bridge: <b id="s1sum">${sum} m</b></span><span id="bpTime">⏱️ ${Math.ceil(L.tLeft)}s</span></div><div class="planks">${Object.keys(R.planks).sort().map(n => `<button class="pk" data-n="${n}" ${L.left[n] ? '' : 'disabled'} style="width:${40 + n * 22}px">${n} m <small>×${L.left[n]}</small></button>`).join('')}<button class="pk undo2" data-u="1" ${L.used.length ? '' : 'disabled'}>↶</button><button class="pk go" data-g="1" ${L.used.length ? '' : 'disabled'}>🚚 Go!</button></div>`);
+    $('#panel').querySelectorAll('.pk').forEach(b => b.onclick = () => { if (L.ended || L.locked) return; if (b.dataset.n) this.add(L, +b.dataset.n); else if (b.dataset.u) { const n = L.used.pop(); if (n) { L.left[n]++; L.grp.remove(L.grp.children[L.grp.children.length - 1]); Sound.sfx('click'); } this.render(L); } else this.go(L); }); },
+  add(L, n) { const sum = L.used.reduce((a, b) => a + b, 0); if (!L.left[n]) return; if (sum + n > L.R.gap) { Sound.sfx('bump'); say(`A ${n} m plank is too long now! Only ${L.R.gap - sum} m is left 📏`, 2500); return; }
+    L.left[n]--; L.used.push(n); const p = mesh('plank', wx(2) - 0.5 + sum + n / 2, -0.05, wz(2), n - 0.06, 0.18, 1.4, L.grp); p.position.y = 1.5; tween(0.25, k => p.position.y = 1.5 - 1.55 * k, () => { burst(p.position, '#d8c7a0', 6, 1.5); Sound.sfx('place'); }); this.render(L); },
+  async go(L) { if (L.ended) return; L.ended = true; L.locked = true; const sum = L.used.reduce((a, b) => a + b, 0), ok = sum === L.R.gap; const t = L.truck, x0 = t.position.x;
+    Sound.sfx('push'); const xEnd = ok ? wx(12) : wx(2) - 0.5 + sum + 0.3; await new Promise(r => tween((xEnd - x0) * 0.12, k => t.position.x = x0 + (xEnd - x0) * k, r));
+    if (ok) { Sound.sfx('win'); confetti(50); L.wins++; await showBanner('🚚 Truck rescued! 🥭', 1300); }
+    else { Sound.sfx('splash'); await new Promise(r => tween(0.5, k => { t.position.y = -k * 1.2; t.rotation.z = -k * 0.6; }, r)); burst(t.position.clone().setY(0), '#7cc4ff', 20); failLevel(`Splash! 💦 The bridge was ${L.R.gap - sum} m too short.`); L.locked = false; L.ended = false; L.used = []; L.left = { ...L.R.planks }; this.showRound(L); return; }
+    L.results = (L.results || []).concat([{ gap: L.R.gap, planks: L.used.join('+') }]); L.round++; L.locked = false;
+    if (L.round >= this.rounds.length) { L.rec.extra = { bridges: L.results.map(r => `${r.gap}=${r.planks}`).join('; '), wins: L.wins }; panel(`<div class="pbig">🌉 All trucks rescued!</div>`); await sleep(500); completeLevel(); }
+    else this.showRound(L); },
+  update(L, dt, t) { M.water.map.offset.x += dt * 0.25; if (L.ended || L.locked || !L.R) return; L.tLeft -= dt; const e = $('#bpTime'); if (e) { e.textContent = `⏱️ ${Math.max(0, Math.ceil(L.tLeft))}s`; e.classList.toggle('low', L.tLeft < 15); }
+    if (L.tLeft <= 0) { L.ended = true; L.rec.fails++; L.rec.firstTry = false; L.results = (L.results || []).concat([{ gap: L.R.gap, planks: 'time' }]); say('Time! Promo helps build this one 🔥', 2000); L.round++; setTimeout(() => { if (L.round >= this.rounds.length) { L.rec.extra = { bridges: L.results.map(r => `${r.gap}=${r.planks}`).join('; '), wins: L.wins }; completeLevel(); } else this.showRound(L); }, 1200); } },
+};
+
 const LEVELS = [
 {
   id: 'L1', name: 'Ember Gate', emoji: '🔥', skill: 'tutorial', skillLabel: 'Warm-up',
@@ -1119,7 +1308,7 @@ NEW.N1,
   onPointer(L, ray) { const cs = L.pads.filter(c => !c.used && c.card.visible); const hit = ray.intersectObjects(cs.map(c => c.card), false)[0]; if (hit) { const c = cs.find(q => q.card === hit.object); this.place(L, c); return true; } return false; },
   update(L, dt, t) { bob(t); if (L.owl) L.owl.material.rotation = Math.sin(t / 500) * 0.1; L.pads.forEach((c, i) => { if (c.card && !c.used) c.card.position.y = 1.05 + Math.sin(t / 350 + i) * 0.08; }); },
 },
-NEW.N2,
+NEW.W1,
 {
   id: 'L4', name: 'Crate Crush', emoji: '📦', skill: 'logic', skillLabel: 'Planning',
   map: ['##########', '#S...#...#', '#.C..#.o.#', '#..C...PP#', '#....#...#', '#x...#...#', '#######E##'],
@@ -1154,14 +1343,19 @@ NEW.N2,
   },
   onEnter() { }, update: (L, dt, t) => bob(t),
 },
-NEW.N6,
+NEW.P1,
+NEW.O1,
 {
   id: 'L6', name: 'Speaker\'s Stage', emoji: '🎤', skill: 'speaking', skillLabel: 'Public Speaking',
   map: ['###########', '#..sssss..#', '#..ssMss..#', '#.........#', '#.c.c.c.c.#', '#x...S...o#', '#####E#####'],
   floor: 'grass',
   intro: 'The crowd is waiting! 🎤 Walk onto the glowing microphone on the stage.',
   goal: 'Walk onto the 🎤 on the stage', noSkip: false,
-  hints: ['Walk up to the stage ⬆️ and step on the glowing 🎤'],
+  talk: { e1: '🪔', t1: 'Invite everyone to the Diwali mela!', p1: 'Type one line to invite the school.', ph: 'Hello everyone! Come to our Diwali mela...', ideas: ['Hello everyone! Please come to our Diwali mela on Friday!', 'Good morning friends! Our Diwali mela has games, sweets and diyas. Do come!', 'Namaste! Bring your family to the school Diwali mela!'],
+    e2: '🌳', t2: 'Convince your class to plant trees!', p2: 'Which line will make your class say YES?', opts: [['Trees give us shade, fresh air and mangoes. Let us plant 10 trees this Saturday!', 1], ['Trees are trees.', 0], ['Plant trees or else!', 0]], tip: 'Hmm, that will not convince them. Which one gives good REASONS?' },
+  tracks: { '7-8': { talk: { e1: '🏫', t1: 'Ask the principal to start a club!', p1: 'Type one line to tell the principal your idea.', ph: 'Good morning Ma\'am! I would like to start a ...', ideas: ['Good morning Ma\'am! May we start a science club? We will meet after school on Fridays.', 'Respected Sir, a coding club will help us learn new skills. Please allow us to start one.', 'Good morning! A reading club will help students read more books every week.'],
+    e2: '❓', t2: 'A tough question from the audience!', p2: 'A student asks: "Won\'t a club waste our study time?" What is the BEST reply?', opts: [['Good question! We meet only once a week, and the club helps us learn too.', 1], ['No it won\'t. Next question.', 0], ['That is a silly question.', 0]], tip: 'Good speakers stay calm and polite and give a reason. Try again!' } } },
+  hints: ['Walk up to the stage ⬆️ and step on the glowing 🎤', 'Good speakers look at people, speak clearly and smile 😊', 'The best answer is polite AND gives a reason 💡'],
   solid: c => c.t === 'c',
   trigger: c => c.t === 'M' && !L.spoke,
   setup(L) {
@@ -1185,132 +1379,100 @@ NEW.N6,
         else { b.style.opacity = 0.4; b.innerHTML += ' ❌'; L.rec.extra.wrongPicks++; L.rec.fails++; L.rec.firstTry = false; Sound.sfx('wrong'); el.querySelector('#spTip').textContent = 'The crowd looks bored 😴. Try another!'; }
       });
     });
-    const ideas = ['Hi everyone! I am happy to be here.', 'Hello friends! Let me tell you a story.', 'Good morning! Today I will show you something cool.'];
-    const res = await modal(`<h2>👋 Say hello to the crowd!</h2><p class="story-text">Type one line you would say.</p><input type="text" id="spLine" maxlength="120" placeholder="Hello everyone! ..."><div id="spIdeas" class="choices hidden" style="margin-top:10px">${ideas.map(i => `<button class="choice" style="min-width:100%">${i}</button>`).join('')}</div><button class="btn" id="spHelp" style="background:#ddd;color:#1a2a4f">💡 Show ideas</button> <button class="btn primary" id="spGo">Speak 🎤</button>`, (el, done) => {
+    const T = this.talk; const ideas = T.ideas;
+    const res = await modal(`<h2>${T.e1} ${T.t1}</h2><p class="story-text">${T.p1}</p><input type="text" id="spLine" maxlength="120" placeholder="${T.ph}"><div id="spIdeas" class="choices hidden" style="margin-top:10px">${ideas.map(i => `<button class="choice" style="min-width:100%">${i}</button>`).join('')}</div><button class="btn" id="spHelp" style="background:#ddd;color:#1a2a4f">💡 Show ideas</button> <button class="btn primary" id="spGo">Speak 🎤</button>`, (el, done) => {
       let picked = false; const inp = el.querySelector('#spLine'); setTimeout(() => inp.focus(), 50);
       el.querySelector('#spHelp').onclick = () => { el.querySelector('#spIdeas').classList.remove('hidden'); };
       el.querySelectorAll('#spIdeas .choice').forEach(b => b.onclick = () => { inp.value = b.textContent; picked = true; });
       el.querySelector('#spGo').onclick = () => { if (!words(inp.value)) { inp.style.borderColor = '#f26b21'; inp.placeholder = 'Type a few words, or tap 💡 Show ideas'; return; } done({ line: inp.value.trim(), picked: picked && ideas.includes(inp.value.trim()) }); };
     });
-    S.speech = { line: res.line, words: words(res.line), pickedIdea: res.picked, wrongPicks: L.rec.extra.wrongPicks };
+    Sound.sfx('cheer'); L.crowd.forEach((p, i) => tween(0.8, k => { p.position.y = Math.abs(Math.sin(k * Math.PI * 2 + i)) * 0.3; }));
+    say('Round 2 is harder! 💪 Choose the BEST answer.', 0); await sleep(600);
+    const r2 = await modal(`<h2>${T.e2} ${T.t2}</h2><p class="story-text">${T.p2}</p><div class="choices">${shuffle(T.opts).map(([t, g]) => `<button class="choice" style="min-width:100%" data-g="${g}">${t}</button>`).join('')}</div><p id="spTip2" class="small"></p>`, (el, done) => {
+      let tries = 0; el.querySelectorAll('.choice').forEach(b => b.onclick = () => { if (b.disabled) return; tries++;
+        if (b.dataset.g === '1') { b.classList.add('sel'); Sound.sfx('good'); setTimeout(() => done({ line: b.textContent, tries }), 500); }
+        else { b.disabled = true; b.style.opacity = 0.4; L.rec.fails++; L.rec.firstTry = false; Sound.sfx('wrong'); el.querySelector('#spTip2').textContent = T.tip; } });
+    });
+    S.speech = { line: res.line, words: words(res.line), pickedIdea: res.picked, wrongPicks: L.rec.extra.wrongPicks, round2: r2.line, round2Tries: r2.tries }; L.rec.extra.round2Tries = r2.tries;
     L.spoke = true; world.remove(L.bang); L.ring.visible = false; Sound.sfx('cheer'); confetti(50);
     L.crowd.forEach((p, i) => tween(1.4, k => { p.position.y = Math.abs(Math.sin(k * Math.PI * 4 + i)) * 0.4; }));
     openGate(); say('The crowd loves you! 👏👏 Walk to the gate ⬇️'); L.locked = false;
   },
   update(L, dt, t) { bob(t); if (L.ring) L.ring.material.opacity = 0.35 + Math.sin(t / 200) * 0.25; },
 },
-NEW.N3,
+NEW.G1,
 NEW.N5,
+NEW.S1,
 {
-  id: 'L7', name: 'Builder\'s Plot', emoji: '🧱', skill: 'creativity', skillLabel: 'Build Challenge',
-  map: ['..........', '.pppppppp.', '.pppppppp.', '.pppppppp.', '.pppppppp.', '.pppppppp.', '..........'],
-  intro: 'BUILD CHALLENGE! 🧱 Copy the model on the stand: same shape, same colors. Tap the glowing square to place blocks.',
-  goal: 'Build the SAME model before time runs out ⏱️', noWalk: true, noSkip: true,
-  hints: ['Pick the right color block first, then tap 🎨', 'Build the bottom layer first, then go up ⬆️', 'Tap the TOP of a block to stack on it.'],
-  mats: [['brick', '#7c8594', '🧱'], ['plank', '#b5834c', '🪵'], ['leaves', '#3f8f35', '🌿'], ['gold', '#ffd23f', '✨'], ['glass', '#9be3ff', '💎'], ['navy', '#1a2a4f', '🟦'], ['orange', '#f26b21', '🔥']],
-  zone: [2, 2],
-  targets: [
-    { name: 'Little Wall', time: 90, ghost: true, b: [[0, 0, 1, 'plank'], [1, 0, 1, 'plank'], [2, 0, 1, 'plank'], [1, 1, 1, 'gold']] },
-    { name: 'Torch Tower', time: 90, b: [[1, 0, 0, 'brick'], [0, 0, 1, 'brick'], [1, 0, 1, 'brick'], [2, 0, 1, 'brick'], [1, 0, 2, 'brick'], [1, 1, 1, 'brick'], [1, 2, 1, 'orange']] },
-    { name: 'Tiny House', time: 120, b: [[0, 0, 0, 'brick'], [1, 0, 0, 'brick'], [2, 0, 0, 'brick'], [0, 0, 1, 'brick'], [1, 0, 1, 'brick'], [2, 0, 1, 'brick'], [0, 0, 2, 'brick'], [2, 0, 2, 'brick'], [0, 1, 1, 'plank'], [1, 1, 1, 'plank'], [2, 1, 1, 'plank'], [1, 2, 1, 'gold']] },
-  ],
+  id: 'L7', name: 'Pattern Builder', emoji: '🧱', skill: 'creativity', skillLabel: 'Pattern Copy (hard)',
+  map: ['..........', '..........', '..........', '..........', '..........', '..........', '..........'],
+  intro: 'PATTERN BUILDER! 🧱 Copy the picture on the stand. Pick a colour, then tap a square.',
+  goal: 'Make your grid look EXACTLY like the picture ⏱️', noWalk: true, noSkip: true, ownTimer: true,
+  hints: ['Start with the top row. Go left to right ➡️', 'Green ✅ = right colour. Tap a square again to change it.', 'Count the squares in the picture 🔢'],
+  cols: { R: ['#e53935', 'Red'], Y: ['#ffd23f', 'Yellow'], B: ['#3b82f6', 'Blue'], G: ['#2fa86b', 'Green'], O: ['#f26b21', 'Orange'], W: ['#f5f5f5', 'White'], P: ['#b46bff', 'Purple'] },
+  pats: [{ name: 'Mango Tile', time: 75, g: ['GYG', 'YOY', 'GYG'], decoy: 'B' }, { name: 'Rangoli', time: 90, g: ['RYR', 'YBY', 'RYR'], decoy: 'G' }],
+  tracks: { '7-8': { pats: [{ name: 'Kite', time: 90, g: ['BRRB', 'RYYR', 'RYYR', 'BRRB'], decoy: 'G' }, { name: 'Rangoli', time: 110, g: ['OGGO', 'GPPG', 'GPYG', 'OGGO'], decoy: 'B' }] } },
   setup(L) {
-    L.start = [0, 3]; L.blocks = new Map(); L.history = []; L.placed = 0; L.mat = 'brick'; L.erase = false; L.round = -1; L.results = []; L.mode = 'challenge';
-    if (!M.glass) { M.glass = new THREE.MeshLambertMaterial({ color: '#9be3ff', transparent: true, opacity: 0.6 }); M.navy = std({ color: '#1a2a4f' }); M.orange = std({ color: '#f26b21', emissive: '#f26b21', emissiveIntensity: 0.3 }); }
-    const [zx, zz] = this.zone;
-    for (const row of grid) for (const c of row) if (c.t === 'p') { const inZ = c.x >= zx && c.x < zx + 3 && c.z >= zz && c.z < zz + 3; const d = mesh(inZ ? new THREE.MeshLambertMaterial({ color: '#c9a36a', emissive: '#f26b21', emissiveIntensity: 0.12 }) : 'dirt', wx(c.x), 0.01, wz(c.z), 0.98, 0.04, 0.98); if (inZ) c.zoneObj = d; }
-    // zone frame
-    const fm = new THREE.MeshBasicMaterial({ color: '#f26b21' }); const cx = wx(zx + 1), cz = wz(zz + 1);
-    [[cx, cz - 1.55, 3.2, 0.1], [cx, cz + 1.55, 3.2, 0.1], [cx - 1.55, cz, 0.1, 3.2], [cx + 1.55, cz, 0.1, 3.2]].forEach(([x, z, sx, sz]) => mesh(fm, x, 0.06, z, sx, 0.06, sz));
-    // pedestal
-    mesh('stone', wx(6.5), 0.5, wz(3), 1.8, 1, 1.8); mesh(M.gold, wx(6.5), 1.03, wz(3), 1.9, 0.06, 1.9);
-    L.model = new THREE.Group(); L.model.position.set(wx(6.5), 1.06, wz(3)); world.add(L.model);
-    const sg = sprite('👀', 0.6); sg.position.set(wx(6.5), 3.1, wz(3)); world.add(sg);
-    L.ghost = new THREE.Group(); world.add(L.ghost);
-    const bar = $('#buildBar'); bar.innerHTML = this.mats.map(([m, col, e]) => `<button data-m="${m}" style="background:${col}" class="${m === 'brick' ? 'sel' : ''}">${e}</button>`).join('') + `<button class="txt" data-x="erase">🧽</button><button class="txt" data-x="undo">↶</button><button class="txt done" data-x="done">✅ Check</button>`;
-    bar.querySelectorAll('button').forEach(b => b.onclick = () => { Sound.sfx('click'); const x = b.dataset.x;
-      if (b.dataset.m) { L.mat = b.dataset.m; L.erase = false; bar.querySelectorAll('button').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); }
-      else if (x === 'erase') { L.erase = !L.erase; bar.querySelectorAll('button').forEach(q => q.classList.remove('sel')); b.classList.toggle('sel', L.erase); }
-      else if (x === 'undo') { const k = L.history.pop(); if (k && L.blocks.has(k)) { world.remove(L.blocks.get(k).o); L.blocks.delete(k); this.live(L); } }
-      else if (x === 'done') { if (L.mode === 'challenge') { if (!L.blocks.size) say('Place some blocks first! 🧱', 2000); else this.endRound(L, 'check'); } else this.finish(L); }
-    });
-    show('#buildBar', true); L.rec.t0 = now(); this.nextRound(L);
+    L.round = -1; L.results = []; L.mat = null; L.grp = new THREE.Group(); world.add(L.grp);
+    mesh('stone', wx(7.5), 0.4, wz(3), 2.6, 0.8, 0.6); L.stand = new THREE.Group(); L.stand.position.set(wx(7.5), 2.3, wz(3)); world.add(L.stand);
+    show('#buildBar', true); document.body.classList.add('pattern'); L.rec.t0 = now(); this.nextRound(L);
   },
-  key: (x, y, z) => x + ',' + y + ',' + z,
-  clearBlocks(L) { L.blocks.forEach(b => world.remove(b.o)); L.blocks.clear(); L.history = []; },
+  cleanup(L) { show('#buildBar', false); document.body.classList.remove('pattern'); },
   nextRound(L) {
-    this.clearBlocks(L); L.round++; L.ghost.clear(); L.model.clear();
-    if (L.round >= this.targets.length) return this.afterChallenge(L);
-    const T = this.targets[L.round]; L.T = T; L.tLeft = T.time; L.ended = false; L.rt0 = now();
-    T.b.forEach(([x, y, z, m]) => { const o = mesh(m, (x - 1) * 0.45, y * 0.45 + 0.225, (z - 1) * 0.45, 0.45, 0.45, 0.45, L.model); });
-    if (T.ghost) { const gm = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.28, depthWrite: false }); T.b.forEach(([x, y, z]) => { const o = new THREE.Mesh(BOX, gm); o.position.set(wx(this.zone[0] + x), y + 0.5, wz(this.zone[1] + z)); o.scale.setScalar(0.96); L.ghost.add(o); }); }
-    panel(`<div class="bpanel"><b>Round ${L.round + 1}/3: ${T.name}</b><span id="bpTime">⏱️ ${T.time}s</span><span id="bpMatch">🎯 0%</span></div><div class="mbar"><i id="bpBar"></i></div>`);
-    say(['Round 1: Little Wall! The see-through blocks show where to build 👻', 'Round 2: Torch Tower! Look at the model on the stand 👀', 'Last round: Tiny House! 🏠 Look at every side of the model.'][L.round], 0);
+    L.round++; L.grp.clear(); L.stand.clear(); if (L.round >= this.pats.length) return this.finish(L);
+    const P = this.pats[L.round], n = P.g.length; L.P = P; L.n = n; L.cells = []; L.tLeft = P.time; L.ended = false; L.rt0 = now();
+    const x0 = 3 - (n - 1) / 2, z0 = 3 - (n - 1) / 2; // grid centred at (3,3)
+    // target picture on the stand (big blocks, facing camera)
+    const sz = 2.4 / n; const back = new THREE.Mesh(BOX, new THREE.MeshLambertMaterial({ color: '#1a2a4f' })); back.scale.set(2.7, 2.7, 0.15); back.position.z = -0.1; L.stand.add(back);
+    P.g.forEach((row, z) => row.split('').forEach((k, x) => { const b = new THREE.Mesh(BOX, new THREE.MeshLambertMaterial({ color: this.cols[k][0] })); b.scale.set(sz * 0.92, sz * 0.92, 0.2); b.position.set((x - (n - 1) / 2) * sz, ((n - 1) / 2 - z) * sz, 0.05); L.stand.add(b); }));
+    L.stand.rotation.x = -0.5; L.stand.scale.setScalar(0.01); tween(0.4, k => L.stand.scale.setScalar(k));
+    for (let z = 0; z < n; z++) for (let x = 0; x < n; x++) { const tile = mesh(new THREE.MeshLambertMaterial({ color: (x + z) % 2 ? '#d9b77e' : '#c9a36a' }), wx(x0 + x), 0.05, wz(z0 + z), 0.94, 0.1, 0.94, L.grp); tile.userData.pc = { x, z }; L.cells.push({ x, z, tile, want: P.g[z][x], have: null, blk: null }); }
+    const fm = new THREE.MeshBasicMaterial({ color: '#f26b21' }); const cx = wx(3), cz = wz(3), h = n / 2 + 0.05;
+    [[cx, cz - h, n + 0.2, 0.1], [cx, cz + h, n + 0.2, 0.1], [cx - h, cz, 0.1, n + 0.2], [cx + h, cz, 0.1, n + 0.2]].forEach(([x, z, sx, sz2]) => mesh(fm, x, 0.12, z, sx, 0.06, sz2, L.grp));
+    const need = [...new Set(P.g.join(''))]; const pal = shuffle([...need, P.decoy]); L.mat = pal[0];
+    const bar = $('#buildBar'); bar.innerHTML = pal.map(k => `<button data-c="${k}" class="pal ${k === L.mat ? 'sel' : ''}" style="background:${this.cols[k][0]}"><span>&nbsp;</span><small>${this.cols[k][1]}</small></button>`).join('') + `<button class="txt done" data-x="done">✅ Done</button>`;
+    bar.querySelectorAll('button').forEach(b => b.onclick = () => { Sound.sfx('click'); if (b.dataset.c) { L.mat = b.dataset.c; bar.querySelectorAll('button').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); } else if (!L.ended) this.endRound(L, 'done'); });
+    panel(`<div class="bpanel"><b>Round ${L.round + 1}/${this.pats.length}: ${P.name}</b><span id="bpTime">⏱️ ${P.time}s</span><span id="bpMatch">✅ 0 / ${n * n}</span></div><div class="mbar"><i id="bpBar"></i></div>`);
+    say(L.round ? `Last one: ${P.name}! 🎨 A bit harder.` : this.intro, 0);
   },
-  match(L) { const T = L.T; if (!T) return 0; const [zx, zz] = this.zone; const tk = new Map(T.b.map(([x, y, z, m]) => [this.key(zx + x, y, zz + z), m])); let ok = 0, extra = 0; L.blocks.forEach((b, k) => { if (tk.get(k) === b.m) ok++; else extra++; }); return Math.round(100 * ok / (T.b.length + extra)); },
-  live(L) { if (L.mode !== 'challenge' || L.ended) return; const p = this.match(L); const el = $('#bpMatch'); if (el) { el.textContent = `🎯 ${p}%`; $('#bpBar').style.width = p + '%'; } if (p === 100) this.endRound(L, 'perfect'); },
-  async endRound(L, why) {
-    if (L.ended) return; L.ended = true; const pct = this.match(L), sec = Math.round(now() - L.rt0);
-    L.results.push({ name: L.T.name, acc: pct, sec, limit: L.T.time }); if (pct < 100) { L.rec.fails++; L.rec.firstTry = false; }
-    if (pct >= 80) { Sound.sfx('win'); confetti(40); } else Sound.sfx('good');
-    await showBanner(pct === 100 ? '🎯 Perfect match!' : why === 'time' ? `⏰ Time! ${pct}% match` : `${pct}% match! 👍`, 1600);
-    this.nextRound(L);
-  },
-  async afterChallenge(L) {
-    show('#panel', false); show('#buildBar', false); L.model.clear();
-    const rs = L.results.map(r => `<div class="rrow">${r.acc === 100 ? '🎯' : '🧱'} ${r.name}: <b>${r.acc}%</b> in ${r.sec}s</div>`).join('');
-    const free = await modal(`<h2>Challenge done! 🏆</h2>${rs}<p class="story-text" style="font-size:18px">Bonus: free build for 45 seconds? Build ANYTHING you like! 🎨</p><button class="btn" data-v="0" style="background:#ddd;color:#1a2a4f">Skip ➜</button> <button class="btn primary" data-v="1">🎨 Free build!</button>`, (el, done) => el.querySelectorAll('button').forEach(b => b.onclick = () => done(b.dataset.v === '1')));
-    if (!free) return this.finish(L);
-    L.mode = 'free'; L.tLeft = 45; L.ended = false; L.placed = 0; show('#buildBar', true); $('#buildBar [data-x=done]').textContent = '✅ Done';
-    panel(`<div class="bpanel"><b>🎨 Free build</b><span id="bpTime">⏱️ 45s</span></div>`); say('Build anything! 🎨 Press ✅ Done when you are happy.', 0);
-  },
-  place(L, x, y, z) {
-    if (L.ended || L.finishing) return; const c = cell(x, z); if (!c || c.t !== 'p' || y < 0 || y > 6) return;
-    const [zx, zz] = this.zone; if (L.mode === 'challenge' && (x < zx || x > zx + 2 || z < zz || z > zz + 2 || y > 3)) { say('Build inside the orange square 🟧', 1800); return; }
-    if (L.mode === 'free' && x >= 5 && x <= 7 && z >= 2 && z <= 4) return;
-    const k = this.key(x, y, z); if (L.blocks.has(k)) return;
-    if (L.blocks.size >= 120) return;
-    const o = mesh(L.mat, wx(x), y + 0.5, wz(z)); o.userData.cell = [x, y, z]; o.scale.setScalar(0.01); tween(0.18, kk => o.scale.setScalar(0.01 + kk * 0.99 + Math.sin(kk * Math.PI) * 0.15));
-    L.blocks.set(k, { o, m: L.mat, x, y, z }); L.history.push(k); L.placed++; Sound.sfx('place'); burst(o.position, '#ffffff', 4, 1.5);
+  set(L, x, z, k) {
+    if (L.ended || L.locked) return; const c = L.cells.find(q => q.x === x && q.z === z); if (!c) return; k = k || L.mat;
+    if (c.blk) L.grp.remove(c.blk); if (c.have === k) { c.have = null; c.blk = null; Sound.sfx('bump'); this.live(L); return; }
+    c.have = k; const b = mesh(new THREE.MeshLambertMaterial({ color: this.cols[k][0] }), c.tile.position.x, 0.4, c.tile.position.z, 0.86, 0.6, 0.86, L.grp); b.userData.pc = { x, z }; c.blk = b;
+    b.scale.setScalar(0.01); tween(0.2, q => b.scale.set(0.86 * (q + Math.sin(q * Math.PI) * 0.2), 0.6 * (q + Math.sin(q * Math.PI) * 0.3), 0.86 * (q + Math.sin(q * Math.PI) * 0.2)));
+    if (k === c.want) { const t = sprite('✅', 0.45); t.position.set(0, 0.75, 0); t.scale.set(0.5 / 0.86, 0.5 / 0.6, 1); b.add(t); burst(b.position, '#2fa86b', 6, 1.5); Sound.tone(600 + this.count(L) * 40, 0.1, 'triangle', 0.15); }
+    else { Sound.sfx('place'); say('Hmm, look at the picture again for that square 👀', 1800); }
     this.live(L);
   },
-  onPointer(L, ray) {
-    const objs = [...L.blocks.values()].map(b => b.o); const hit = ray.intersectObjects(objs, false)[0];
-    if (hit) {
-      const [x, y, z] = hit.object.userData.cell;
-      if (L.erase) { const k = this.key(x, y, z); world.remove(hit.object); L.blocks.delete(k); Sound.sfx('bump'); this.live(L); return true; }
-      const n = hit.face.normal; this.place(L, x + Math.round(n.x), y + Math.round(n.y), z + Math.round(n.z)); return true;
-    }
-    const p = new THREE.Vector3(); if (ray.ray.intersectPlane(plane, p) && !L.erase) { this.place(L, Math.round(p.x + (GW - 1) / 2), 0, Math.round(p.z + (GH - 1) / 2)); }
-    return true;
+  count(L) { return L.cells.filter(c => c.have === c.want).length; },
+  live(L) { const ok = this.count(L), n2 = L.n * L.n; const e = $('#bpMatch'); if (e) e.textContent = `✅ ${ok} / ${n2}`; const b = $('#bpBar'); if (b) b.style.width = (100 * ok / n2) + '%'; if (ok === n2 && L.cells.every(c => c.have === c.want)) this.endRound(L, 'perfect'); },
+  async endRound(L, why) {
+    if (L.ended) return; L.ended = true; const ok = this.count(L), pct = Math.round(100 * ok / (L.n * L.n)), sec = Math.round(now() - L.rt0);
+    L.results.push({ name: L.P.name, acc: pct, sec, limit: L.P.time }); if (pct < 100) { L.rec.fails++; L.rec.firstTry = false; }
+    if (pct === 100) { Sound.sfx('win'); confetti(80); L.cells.forEach((c, i) => { if (c.blk) { const b = c.blk; tween(0.9, k => b.position.y = 0.4 + Math.abs(Math.sin(k * Math.PI * 2 + i * 0.4)) * 0.6); } }); tween(0.9, k => L.stand.rotation.y = k * Math.PI * 2); }
+    else Sound.sfx('good');
+    await showBanner(pct === 100 ? `🎉 Perfect ${L.P.name}!` : why === 'time' ? `⏰ Time! ${pct}% right` : `${pct}% right! 👍`, 1600);
+    this.nextRound(L);
   },
+  onPointer(L, ray) { const hit = ray.intersectObjects(L.grp.children.filter(o => o.userData.pc), false)[0]; if (hit) { const { x, z } = hit.object.userData.pc; this.set(L, x, z); } return true; },
   async finish(L) {
     if (L.finishing) return; L.finishing = true; show('#buildBar', false); show('#panel', false);
-    const types = [['🏰', 'Fort'], ['🗼', 'Tower'], ['🐉', 'Creature'], ['🏠', 'Home'], ['🚀', 'Machine'], ['✨', 'Something new']];
-    const res = await modal(`<h2>${L.mode === 'free' ? 'What did you build? 🧱' : 'Which build was your favorite? 🧱'}</h2><div class="choices">${types.map(([e, t]) => `<button class="choice" data-t="${t}"><span class="em">${e}</span>${t}</button>`).join('')}</div><input type="text" id="bName" maxlength="40" placeholder="Give it a name (optional)"><input type="text" id="bWhy" maxlength="140" placeholder="Why will Promo love it? (one line)"><button class="btn primary" id="bGo" disabled>Finish ✅</button>`, (el, done) => {
-      let type = null; el.querySelectorAll('.choice').forEach(b => b.onclick = () => { type = b.dataset.t; el.querySelectorAll('.choice').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); el.querySelector('#bGo').disabled = false; Sound.sfx('click'); });
-      el.querySelector('#bGo').onclick = () => done({ type, name: el.querySelector('#bName').value.trim(), why: el.querySelector('#bWhy').value.trim() });
-    });
-    const bl = L.mode === 'free' ? [...L.blocks.values()] : []; const mats = new Set(bl.map(b => b.m)); const foot = new Set(bl.map(b => b.x + ',' + b.z));
+    const res = await modal(`<h2>Pattern Builder done! 🏆</h2>${L.results.map(r => `<div class="rrow">${r.acc === 100 ? '🎯' : '🧱'} ${r.name}: <b>${r.acc}%</b> in ${r.sec}s</div>`).join('')}<input type="text" id="bWhy" maxlength="140" placeholder="Where could you use a pattern like this? (optional)"><button class="btn primary" id="bGo">Finish ✅</button>`, (el, done) => { el.querySelector('#bGo').onclick = () => done({ why: el.querySelector('#bWhy').value.trim() }); });
     const R = L.results; const acc = R.length ? R.reduce((a, r) => a + r.acc, 0) / R.length / 100 : 0; const timeFrac = R.length ? R.reduce((a, r) => a + (r.acc === 100 ? Math.max(0, 1 - r.sec / r.limit) : 0), 0) / R.length : 0;
-    S.build = { rounds: R, acc: Math.round(acc * 100) / 100, timeFrac: Math.round(timeFrac * 100) / 100, perfect: R.filter(r => r.acc === 100).length, bonus: L.mode === 'free', blocks: bl.length, materials: mats.size, height: bl.length ? Math.max(...bl.map(b => b.y + 1)) : 0, footprint: foot.size, type: res.type, name: res.name, why: res.why, whyWords: words(res.why), buildSec: Math.round(now() - L.rec.t0) };
+    S.build = { rounds: R, acc: Math.round(acc * 100) / 100, timeFrac: Math.round(timeFrac * 100) / 100, perfect: R.filter(r => r.acc === 100).length, bonus: false, blocks: 0, materials: 0, height: 0, footprint: 0, type: 'pattern', name: R.map(r => r.name).join(' + '), why: res.why, whyWords: words(res.why), buildSec: Math.round(now() - L.rec.t0), grid: L.n };
     L.rec.extra = { ...S.build, rounds: R.map(r => `${r.name} ${r.acc}% ${r.sec}s`).join('; ') };
-    say(`Promo LOVES it! 😍 "${(res.name || res.type).replace(/[<>&]/g, '')}"`, 3000); confetti(60); Sound.sfx('cheer');
-    tween(1.5, k => { bl.forEach((b, i) => b.o.position.y = b.y + 0.5 + Math.abs(Math.sin(k * Math.PI * 2 + i * 0.3)) * 0.15); });
-    await sleep(1600); completeLevel();
+    confetti(60); Sound.sfx('cheer'); say('Promo LOVES your patterns! 😍', 2000); await sleep(1200); completeLevel();
   },
   update(L, dt, t) {
-    if (L.model) L.model.rotation.y += dt * 0.7;
-    if (L.ghost) L.ghost.children.forEach(o => o.material.opacity = 0.22 + Math.sin(t / 300) * 0.08);
-    if (L.ended || L.finishing || L.locked || L.round < 0 || L.round >= 3 && L.mode !== 'free') return;
+    if (L.stand && !L.ended) L.stand.position.y = 2.3 + Math.sin(t / 500) * 0.05;
+    if (L.ended || L.finishing || L.locked || !L.P) return;
     L.tLeft -= dt; const el = $('#bpTime'); if (el) { el.textContent = `⏱️ ${Math.max(0, Math.ceil(L.tLeft))}s`; el.classList.toggle('low', L.tLeft < 15); }
-    if (L.tLeft <= 0) { if (L.mode === 'challenge') this.endRound(L, 'time'); else this.finish(L); }
-  },
+    if (L.tLeft <= 0) this.endRound(L, 'time');
+  }
 },
-NEW.N4,
 {
   id: 'L8', name: 'Shadow Golem', emoji: '👹', skill: 'boss', skillLabel: 'Final Boss!', music: 'boss', floor: 'stone', camZ: -1.2, sky: '#3d3a63',
-  map: ['###########', '#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '#....S....#', '###########'],
+  map: ['###############', '#.............#', '#.............#', '#.............#', '#.............#', '#.............#', '#.............#', '#.............#', '#......S......#', '###############'],
   intro: 'The Shadow Golem! 😱 Grab glowing 🔥 embers to throw fire at it. Dodge the RED tiles!',
   goal: 'Grab 🔥 to attack. Step OFF red tiles!',
   hints: ['When tiles turn RED, quickly step onto a normal tile!', 'Grab the glowing 🔥 ember. You throw it at the golem automatically!', 'Stay in the middle so you can move any way.'],
@@ -1408,7 +1570,7 @@ NEW.N4,
 
 /* ================= SCORING ================= */
 const TOTAL_STARS = LEVELS.reduce((n, d) => n + d.map.join('').split('').filter(ch => ch === '*' || ch === 'x').length, 0);
-const PUZZLES = ['L2', 'L3', 'L4', 'L5', 'L6', 'L8', 'N1', 'N2', 'N4', 'N5'];
+const PUZZLES = ['L2', 'L3', 'L4', 'L5', 'L6', 'N1', 'N5', 'W1', 'P1', 'O1', 'S1'];
 function computeScores() {
   const lv = S.levels.filter(Boolean); const byId = Object.fromEntries(lv.map(l => [l.id, l]));
   // Problem-solving (35): 10 puzzle islands; full marks for solving, small deductions per extra try / hint
@@ -1420,11 +1582,11 @@ function computeScores() {
   // Curiosity (15): secret stars + exploring
   const explore = lv.reduce((a, l) => a + l.explore, 0) - S.stars;
   const curiosity = 12 * Math.min(1, S.stars / (TOTAL_STARS * 0.75)) + Math.min(3, explore + (S.promoTaps > 0 ? 1 : 0));
-  // Creativity (20): build challenge accuracy 8 + speed 2, bonus free build 4, Dream Machine 3, Tale Trail 3
+  // Creativity (20): build challenge accuracy 8 + speed 2, bonus free build 4, Gadget Workshop invention 3 + explanation 3
   const b = S.build || {}, iv = S.invent || {}, tl = S.tale || {};
-  const creativity = 8 * (b.acc || 0) + 2 * (b.timeFrac || 0) + (b.bonus ? 2 * Math.min(1, b.blocks / 15) + Math.min(1, b.materials / 4) : 0) + (b.name ? 1 : 0)
+  const creativity = 8 * (b.acc || 0) + 2 * (b.timeFrac || 0) + (b.bonus ? 2 * Math.min(1, b.blocks / 15) + Math.min(1, b.materials / 4) : (b.type === 'pattern' ? 3 * (b.perfect || 0) / Math.max(1, (b.rounds || []).length) : 0)) + (b.name ? 1 : 0)
     + (iv.name ? 1.5 : 0) + (iv.words >= 4 ? 1.5 : iv.words ? 0.75 : 0) + (tl.who ? 1.5 : 0) + (tl.words >= 5 ? 1.5 : tl.words ? 0.75 : 0);
-  // Communication (10): hello line 3, steady voice 2, build reason 1.5, story ending 1.5, invention line 1, boss reflection 1
+  // Communication (10): stage line 3, Word Turtle spelling accuracy 2, build reason 1.5, gadget explanation 1.5 + 1, boss reflection 1
   const sp = S.speech || {}, bo = S.boss || {}, vo = S.voice || {};
   const communication = (sp.words ? (sp.pickedIdea ? 1.5 : (sp.words >= 4 ? 3 : 2)) : 0) + 2 * (vo.ratio || 0) + (b.whyWords >= 4 ? 1.5 : b.whyWords ? 0.75 : 0) + (tl.words >= 5 ? 1.5 : tl.words ? 0.75 : 0) + (iv.words >= 4 ? 1 : iv.words ? 0.5 : 0) + (bo.how ? 0.5 : 0) + (bo.lineWords >= 3 ? 0.5 : bo.lineWords ? 0.25 : 0);
   const r = v => Math.round(Math.min(v, 1e9) * 10) / 10;
@@ -1446,23 +1608,23 @@ function badgePool(totalSec) {
     ['fast', '⚡', 'Fast Thinker', 'Solved puzzles quickly', 30 / avgT],
     ['never', '💪', 'Never Give Up', 'Kept going after mistakes', lv.filter(l => l.fails > 0 && l.completed).length / 2],
     ['stars', '⭐', 'Star Seeker', 'Found secret stars', S.stars / Math.max(1, TOTAL_STARS * 0.6)],
-    ['builder', '🧱', 'Perfect Builder', 'Copied the models exactly', (b.acc || 0) / 0.95 + (b.perfect === 3 ? 0.1 : 0)],
+    ['builder', '🧱', 'Perfect Builder', 'Copied the patterns exactly', (b.acc || 0) / 0.95 + (b.perfect && b.perfect === (b.rounds || []).length ? 0.1 : 0)],
     ['story', '📖', 'Story Master', 'Put every story in order', lvl('L5', l => 1.15 - 0.3 * l.fails - 0.2 * l.hints)],
     ['golem', '👹', 'Golem Slayer', 'Defeated the Shadow Golem', lvl('L8', l => l.skipped ? 0 : 1 + 0.03 * (bo.heartsLeft || 0))],
     ['ai', '🤖', 'AI Whisperer', 'Taught and fixed the robots', ['L3', 'N1', 'N5'].reduce((a, id) => a + lvl(id, l => l.fails === 0 && l.hints === 0 ? 1.12 : Math.max(0.3, 0.85 - 0.15 * l.fails)), 0) / 3],
     ['explorer', '🧭', 'Explorer', 'Peeked into hidden spots', explore / 4],
-    ['planner', '🧠', 'Careful Planner', 'Solved logic with few resets', ['L2', 'L4', 'N4'].filter(id => by[id] && by[id].completed && by[id].fails <= 1).length / 3 * 1.05],
+    ['planner', '🧠', 'Careful Planner', 'Solved logic with few resets', ['L2', 'L4', 'O1'].filter(id => by[id] && by[id].completed && by[id].fails <= 1).length / 3 * 1.05],
     ['nohint', '🦸', 'No-Hint Hero', 'Never needed a hint', hints === 0 ? 1.02 : 0.8 / hints],
     ['comeback', '🔄', 'Comeback Kid', 'Won after 2+ tries', Math.max(0, ...lv.filter(l => l.completed && !l.skipped).map(l => l.fails)) / 2],
     ['speed', '🏃', 'Speed Runner', 'Finished the quest fast', 780 / Math.max(1, totalSec)],
-    ['kind', '💬', 'Kind Speaker', 'Greeted the crowd warmly', sp.words ? (kind && sp.words >= 4 ? 1.08 : sp.words >= 4 ? 0.85 : 0.5) : 0],
-    ['voice', '🎙️', 'Steady Voice', 'Spoke right on the beat', (S.voice ? S.voice.ratio : 0) / 0.85],
+    ['kind', '💬', 'Kind Speaker', 'Spoke warmly on stage', sp.words ? (kind && sp.words >= 4 ? 1.08 : sp.words >= 4 ? 0.85 : 0.5) : 0],
+    ['voice', '🐢', 'Word Wizard', 'Spelled words with few slips', (S.voice ? S.voice.ratio : 0) / 0.85],
     ['ember', '🔥', 'Ember Collector', 'Gathered lots of embers', S.embers / 12],
-    ['inventor', '💡', 'Inventor', 'Dreamed up a new machine', S.invent ? (S.invent.words >= 4 ? 1.06 : 0.75) : 0],
-    ['artist', '🎨', 'Free Builder', 'Made a bonus creation', b.bonus ? b.blocks / 12 : 0],
+    ['inventor', '💡', 'Inventor', 'Invented a helpful gadget', S.invent ? (S.invent.words >= 4 ? 1.06 : 0.75) : 0],
+    ['artist', '🎨', 'Pattern Pro', 'Copied every pattern in time', b.type === 'pattern' ? (b.perfect || 0) / Math.max(1, (b.rounds || []).length) * (0.9 + 0.3 * (b.timeFrac || 0)) : 0],
     ['untouch', '🛡️', 'Untouchable', 'Beat the Golem with all hearts', lvl('L8', () => (bo.heartsLeft || 0) / 3 * 1.1)],
     ['firsttry', '🎯', 'First-Try Champ', 'Solved puzzles on the first try', PUZZLES.filter(id => by[id] && by[id].completed && by[id].firstTry).length / (PUZZLES.length * 0.7)],
-    ['tale', '🗺️', 'Tale Weaver', 'Wrote a great story ending', S.tale ? S.tale.words / 7 : 0],
+    ['tale', '🛠️', 'Gadget Explainer', 'Explained how the gadget helps', S.tale ? S.tale.words / 7 : 0],
   ].map(([id, e, n, d, v]) => ({ id, e, n, d, v: Math.round(Math.max(0, v || 0) * 100) / 100 }));
 }
 function topBadges(totalSec) {
@@ -1475,21 +1637,16 @@ function topBadges(totalSec) {
 function getArchive() { try { return JSON.parse(localStorage.getItem(ARCHIVE_KEY) || '[]'); } catch (e) { return []; } }
 function setArchive(a) { try { localStorage.setItem(ARCHIVE_KEY, JSON.stringify(a)); } catch (e) { } }
 function levelLine(l) { return l ? `${l.time}s, tries ${l.attempts}, fails ${l.fails}, hints ${l.hints}, stars ${l.stars}, explore ${l.explore}, ${l.skipped ? 'SKIPPED' : l.completed ? 'done' : 'not done'}${l.firstTry ? ', first-try' : ''}` : 'not reached'; }
+const SKILLS = [['problem', 'Problem-solving', 35], ['persistence', 'Persistence', 20], ['curiosity', 'Curiosity', 15], ['creativity', 'Creativity', 20], ['communication', 'Communication', 10]];
+function goodAt(sc) { return SKILLS.map(([k, n, m]) => [n, sc[k] / m]).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]).join(', '); }
+function shortlisted(rec) { const band = rec.band || '5-6'; const same = getArchive().filter(r => !r.test && (r.band || '5-6') === band).map(r => r.scores.total).sort((a, b) => b - a); const rank = same.filter(t => t > rec.scores.total).length + 1; return rank <= 25 ? `Yes (top 25, Grade ${band})` : 'Not yet'; }
 async function submitRecord(rec) {
   const url = CFG.SUBMIT_URL; if (!url) throw new Error('no url');
   const body = {
     _subject: `${rec.test ? 'TEST - ' : ''}Promethia Quest: ${rec.name} (G${rec.grade}${rec.section}) ${rec.scores.total}/100 ${rec.title}`,
     _template: 'table', _captcha: 'false',
-    attempt_id: rec.id, student: rec.name, grade: rec.grade, section: rec.section, lab_pc: rec.pc, test: rec.test ? 'YES' : 'no',
-    total_score: rec.scores.total, title: rec.title, badges_top5: rec.badges.join(', '), problem_solving_35: rec.scores.problem, persistence_20: rec.scores.persistence, curiosity_15: rec.scores.curiosity, creativity_20: rec.scores.creativity, communication_10: rec.scores.communication,
-    total_minutes: (rec.totalSec / 60).toFixed(1), first_try_puzzles: `${rec.firstTry}/${rec.puzzles}`, stars: `${rec.stars}/${TOTAL_STARS}`, embers: rec.embers, hero: rec.hero, island_stars: rec.islandStars.join(''),
-    ...Object.fromEntries(LEVELS.map((d, i) => [`L${i + 1}_${d.name.replace(/[^A-Za-z]/g, '')}`, levelLine(rec.levels[i])])),
-    build_challenge: rec.build && rec.build.rounds ? rec.build.rounds.map(r => `${r.name} ${r.acc}% ${r.sec}s`).join('; ') + ` (avg ${Math.round(rec.build.acc * 100)}%)` : '',
-    build: rec.build ? `${rec.build.bonus ? `bonus ${rec.build.blocks} blocks, ${rec.build.materials} materials, height ${rec.build.height}` : 'no bonus build'}, type ${rec.build.type}, name "${rec.build.name}"` : '',
-    voice_on_beat: rec.voice ? `${rec.voice.good} on-beat, ${rec.voice.miss} off-beat` : '', tale: rec.tale ? `${rec.tale.who} / ${rec.tale.where} / ${rec.tale.problem} / ending: ${rec.tale.ending}` : '',
-    invention: rec.invent ? `${rec.invent.parts.join(' + ')} = "${rec.invent.name}": ${rec.invent.does}` : '',
-    build_why: rec.build ? rec.build.why : '', speech_line: rec.speech ? rec.speech.line : '', speech_wrong_picks: rec.speech ? rec.speech.wrongPicks : '',
-    boss_how: rec.boss ? rec.boss.how : '', boss_line: rec.boss ? rec.boss.line : '', finished_at: rec.finishedAt, device: `${innerWidth}x${innerHeight}`,
+    Name: rec.name, 'Grade/Section': `${rec.grade}${rec.section ? ' ' + rec.section : ''}`, 'Time taken': `${Math.floor(rec.totalSec / 60)} min ${rec.totalSec % 60} s`,
+    'Overall performance': `${rec.scores.total}/100`, Title: rec.title, 'Good at': goodAt(rec.scores), Shortlisted: shortlisted(rec),
   };
   const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 15000);
   try {
@@ -1509,7 +1666,7 @@ async function finishGame() {
   L.locked = true; ['#hud', '#actions', '#dpad', '#promo', '#buildBar'].forEach(s => show(s, false));
   const { sc, firstTry, puzzles } = computeScores(); const title = titleFor(sc.total);
   const rec = {
-    id: 'PQ-' + Date.now().toString(36).toUpperCase(), test: TEST, name: S.student.name, grade: S.student.grade, section: S.student.section, pc: S.student.pc, hero: S.hero.name,
+    id: 'PQ-' + Date.now().toString(36).toUpperCase(), test: TEST, name: S.student.name, school: S.student.school, band: S.band, grade: S.student.grade, section: S.student.section, pc: S.student.pc, hero: S.hero.name,
     startedAt: S.startedAt, finishedAt: new Date().toISOString(), totalSec: Math.round((Date.now() - new Date(S.startedAt).getTime()) / 1000),
     levels: S.levels.map(l => l && ({ id: l.id, name: l.name, skill: l.skill, time: l.time, attempts: l.attempts, fails: l.fails, hints: l.hints, stars: l.stars, explore: l.explore, embers: l.embers, completed: l.completed, skipped: l.skipped, firstTry: l.firstTry })),
     build: S.build, speech: S.speech, boss: S.boss, voice: S.voice, tale: S.tale, invent: S.invent, stars: S.stars, embers: S.embers, scores: sc, firstTry, puzzles, title, sent: false,
@@ -1547,8 +1704,8 @@ const STORY = [
 ];
 $('#startForm').addEventListener('submit', async e => {
   e.preventDefault(); Sound.init();
-  S.student = { name: $('#fName').value.trim(), grade: $('#fGrade').value, section: $('#fSection').value.trim().toUpperCase(), pc: $('#fPC').value.trim() };
-  if (!S.student.name) return;
+  S.student = { name: $('#fName').value.trim(), school: ($('#fSchool') ? $('#fSchool').value.trim() : '') || CFG.SCHOOL || '', grade: $('#fGrade').value, section: $('#fSection').value.trim().toUpperCase(), pc: $('#fPC').value.trim() };
+  if (!S.student.name) return; S.band = bandFor(S.student.grade);
   show('#start', false); show('#story');
   let i = 0; const step = () => { $('#storyArt').textContent = STORY[i][0]; $('#storyText').innerHTML = STORY[i][1]; Sound.sfx('click'); };
   step(); $('#storyNext').onclick = () => { i++; if (i < STORY.length) step(); else { show('#story', false); pickHero(); } };
@@ -1583,5 +1740,5 @@ applyQuality(); requestAnimationFrame(loop);
 })();
 retryUnsent();
 if (DEBUG) {
-  window.PQ = { S, topBadges, badgePool, islandStars, get MODE() { return MODE; }, LEVELS, get L() { return L; }, win: () => completeLevel(), start: i => startLevel(i), cell, player, tryStep, get grid() { return grid; }, computeScores, findPath, go: (x, z) => { const p = findPath(x, z); if (p) player.queue = p; return !!p; } };
+  window.PQ = { get camera() { return camera; }, S, topBadges, badgePool, islandStars, get MODE() { return MODE; }, LEVELS, get L() { return L; }, win: () => completeLevel(), start: i => startLevel(i), cell, player, tryStep, get grid() { return grid; }, computeScores, findPath, go: (x, z) => { const p = findPath(x, z); if (p) player.queue = p; return !!p; } };
 }

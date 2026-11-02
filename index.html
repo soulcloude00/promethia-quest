@@ -15,7 +15,7 @@
 <div id="hud" class="hidden">
   <div class="hud-left">
     <img src="assets/logo-mark-96.png" alt="" class="hud-logo">
-    <div><div id="lvlName">Level</div><div id="lvlGoal" class="sub"></div></div>
+    <div><div id="lvlName">Level</div><div class="sub"><span id="lvlGoal"></span> <span id="totalTime" title="Total time"></span></div></div>
   </div>
   <div id="progress"></div>
   <div class="hud-right">
@@ -72,6 +72,7 @@
     <p class="tag">Relight the Great Torch! · 14 islands</p>
     <form id="startForm" autocomplete="off">
       <label>Your name<input id="fName" required maxlength="40" placeholder="First and last name"></label>
+      <label>School<input id="fSchool" maxlength="60" placeholder="School name"></label>
       <div class="row">
         <label>Grade<select id="fGrade" required><option value="">-</option><option>5</option><option>6</option><option>7</option><option>8</option><option>Other</option></select></label>
         <label>Section<input id="fSection" maxlength="6" placeholder="A"></label>
