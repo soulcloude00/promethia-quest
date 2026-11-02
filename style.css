@@ -261,3 +261,31 @@ body[data-level=S1] .sstrip .bank{font-size:20px}
 .avfig.girl .l{background:linear-gradient(#1a2a4f 45%,transparent 45%),linear-gradient(90deg,#c98f65 30%,transparent 30% 70%,#c98f65 70%)}
 #resAv{margin-right:8px;transform:scale(1.1)}
 body[data-level=S1] .sstrip{width:100%}body[data-level=S1] .sstrip .sc{flex:1 1 0;min-width:0;width:auto}body[data-level=S1] .sstrip .sp{flex:0 0 12px;width:12px}
+#finale.top,#finale.sub{justify-content:flex-start;padding-top:max(60px,8vh);background:none}
+#finale.sub .fin-s{position:fixed;bottom:max(40px,8vh);left:50%;transform:translateX(-50%);display:block}
+#finale.sub .fin-tap{position:fixed;bottom:max(14px,3vh);left:0;right:0;display:block}
+#finale .fin-t{max-width:94vw}
+#finale.sub .fin-s{max-width:none;white-space:nowrap}@media (max-width:600px){#finale.sub .fin-s{white-space:normal;max-width:90vw}}
+/* Setu how-to demo */
+.sdemo{position:relative;margin:6px auto;padding:10px;background:#eaf6ff;border-radius:16px;max-width:460px}
+.sdm{display:flex;gap:8px;justify-content:center}.sdm .dm{display:flex;flex-direction:column;align-items:center;font-size:26px;background:#fff;border:3px solid #1a2a4f33;border-radius:12px;padding:4px 10px;transition:all .2s}.sdm .dm small{font-size:12px;font-weight:800;color:#1a2a4f}
+.sdm .dm.sel{border-color:#f26b21;background:#ffe2cc;transform:scale(1.08)}.sdm .dfill{background:#eef6ff}
+.sdstrip{display:flex;align-items:center;justify-content:center;gap:3px;margin:12px 0 4px;font-size:22px}
+.sdstrip .db{display:block;width:40px;height:30px;border:2px dashed #1a2a4f66;border-radius:6px;background:#fff8;transition:all .3s}
+.sdstrip .db.steel{background:#9aa6b5;border:2px solid #5a6676}.sdstrip .db.long{background:#ff8a8a;border-color:#c62828}
+.sdstrip .dp{display:block;width:8px;height:30px;border-radius:3px;background:#ffd23f66}.sdstrip .dp.on{background:#7a7a7a;height:44px;margin-top:14px}
+.sdtruck{font-size:30px;transform:translateX(-150px);transition:transform 2.2s linear;text-align:center}.sdtruck.go{transform:translateX(150px)}
+.dgo{display:block;margin:4px auto 0;padding:6px 14px;border:none;border-radius:12px;background:#f26b21;color:#fff;font-weight:900;font-size:15px}
+.sdemo .jfinger{position:absolute;font-size:32px;transition:left .5s,top .5s;pointer-events:none;z-index:2}
+.sstrip .sc.long{outline:3px solid #e53935;background:#ffb3b3!important}
+.swarn{background:#ffe5e5;color:#c62828;font-weight:900;border-radius:10px;padding:3px 8px;margin:3px 0;font-size:14px;animation:pop .4s}
+.bpanel .cost{font-weight:900}
+/* Setu: pick one material + pillar count */
+.smats.big{gap:8px}.smats.big .sm{min-width:110px;padding:6px 8px;cursor:pointer}.smats.big .sm .si{font-size:34px}.smats.big .sm span{font-size:16px}.smats.big .sm small{font-size:12px;display:block}
+.spil{display:flex;align-items:center;justify-content:center;gap:6px;margin:6px 0;font-weight:900}
+.pk2{width:44px;height:40px;border-radius:10px;border:3px solid #1a2a4f33;background:#fff;font-size:20px;font-weight:900;color:#1a2a4f;cursor:pointer}.pk2.sel{border-color:#f26b21;background:#ffe2cc}
+.sinfo{font-size:14px;text-align:center}.scost{font-size:15px;text-align:center;margin:4px 0;font-weight:700}.scost.bad{color:#c62828}
+.pk.go[disabled]{opacity:.45;cursor:not-allowed}
+body[data-level=S1] #panel{max-width:min(440px,96vw)}
+@media (min-width:700px) and (min-height:501px){body[data-level=S1] #panel{max-width:440px}}
+@media (orientation:landscape) and (max-height:500px){.smats.big .sm{min-width:80px}.smats.big .sm small{font-size:10px}.smats.big .sm .si{font-size:20px}}

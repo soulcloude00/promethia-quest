@@ -568,14 +568,16 @@ async function earthZoom() {
 /* ================= STATE + UI ================= */
 const S = { band: '5-6', student: null, hero: null, startedAt: null, idx: 0, embers: 0, stars: 0, levels: [], build: null, speech: null, boss: null, promoTaps: 0 };
 let promoTimer = null;
-function say(text, ms) { const p = $('#promo'); p.classList.remove('hidden'); $('#promoText').innerHTML = text; clearTimeout(promoTimer); if (ms) promoTimer = setTimeout(() => L && L.goalText && ($('#promoText').innerHTML = L.goalText), ms); }
+// on lab PCs (mouse) say 'click', not 'tap'
+function pcWords(h) { return (typeof isTouch !== 'undefined' && isTouch) || typeof h !== 'string' ? h : h.replace(/\bTap\b/g, 'Click').replace(/\btap\b/g, 'click').replace(/\btapping\b/g, 'clicking'); }
+function say(text, ms) { text = pcWords(text); const p = $('#promo'); p.classList.remove('hidden'); $('#promoText').innerHTML = text; clearTimeout(promoTimer); if (ms) promoTimer = setTimeout(() => L && L.goalText && ($('#promoText').innerHTML = L.goalText), ms); }
 function hud() {
   $('#embers').textContent = S.embers; $('#stars').textContent = S.stars;
   const pr = $('#progress'); pr.innerHTML = LEVELS.map((l, i) => `<i class="${i < S.idx ? 'done' : i === S.idx ? 'now' : ''}" title="${l.name}"></i>`).join('');
 }
 function showBanner(t, ms = 1400) { $('#bannerText').innerHTML = t; $('#banner').classList.remove('hidden'); const b = $('#bannerText'); b.style.animation = 'none'; b.offsetHeight; b.style.animation = ''; return new Promise(r => setTimeout(() => { $('#banner').classList.add('hidden'); r(); }, ms)); }
 function modal(html, bind) {
-  return new Promise(res => { $('#modalCard').innerHTML = html; $('#modal').classList.remove('hidden'); if (L) L.locked = true; bind($('#modalCard'), v => { $('#modal').classList.add('hidden'); if (L) L.locked = false; res(v); }); });
+  return new Promise(res => { $('#modalCard').innerHTML = pcWords(html); $('#modal').classList.remove('hidden'); if (L) L.locked = true; bind($('#modalCard'), v => { $('#modal').classList.add('hidden'); if (L) L.locked = false; res(v); }); });
 }
 function fade(on) { $('#fade').classList.toggle('on', on); return sleep(380); }
 function show(id, on = true) { $(id).classList.toggle('hidden', !on); }
@@ -756,7 +758,7 @@ function makeBot(c, scale = 1) {
   mesh(m('#555'), 0, 0.95, 0, 0.06, 0.3, 0.06, g); mesh(M.gold, 0, 1.12, 0, 0.14, 0.14, 0.14, g); mesh(m('#7c8aa3'), -0.45, 0.45, 0, 0.16, 0.5, 0.16, g); mesh(m('#7c8aa3'), 0.45, 0.45, 0, 0.16, 0.5, 0.16, g);
   g.scale.setScalar(scale); g.position.set(wx(c.x), 0, wz(c.z)); world.add(g); return g;
 }
-function panel(html) { $('#panel').innerHTML = html; show('#panel', true); }
+function panel(html) { $('#panel').innerHTML = pcWords(html); show('#panel', true); }
 function botHop(b) { if (b) tween(0.8, k => { b.rotation.y = k * Math.PI * 2; b.position.y = Math.sin(k * Math.PI) * 0.5; }); }
 
 /* ---------- N1 Robot Sorter (AI, easy) ---------- */
@@ -1159,7 +1161,7 @@ NEW.S1 = {
   pillarCost: 250,
   rounds: [{ gap: 6, load: 0.5, who: '🛒 mango cart', budget: 900, block: [] }, { gap: 8, load: 2, who: '🚚 mango truck', budget: 3200, block: [] }, { gap: 10, load: 2.5, who: '🚛 heavy truck', budget: 3800, block: [5] }],
   tracks: { '7-8': { rounds: [{ gap: 6, load: 0.5, who: '🛒 mango cart', budget: 700, block: [] }, { gap: 8, load: 2, who: '🚚 mango truck', budget: 2800, block: [] }, { gap: 10, load: 2.5, who: '🚛 heavy truck', budget: 3600, block: [5] }], hints: [] } },
-  intro: 'Build a real setu (bridge)! 🌉 Pick a material, tap each metre of the bridge, and add pillars ┃ if a span is too long.',
+  intro: 'Build a setu (bridge)! 🌉 Pick ONE material and how many pillars ┃, then Test drive. Strong enough, short enough spans, and within budget!',
   goal: 'Strong enough, every span short enough, and under budget',
   hints: L => [`The ${L.R ? L.R.who : 'truck'} weighs ${L.R ? L.R.load : ''} t. Pick a material that holds at least that much 💪`, 'Each material can only reach so far between supports (max span). Add a pillar ┃ to split a long span.', 'Cheaper is better, but it must not break! Check the budget 💰', L.R && L.R.block.length ? 'The strong current 🌊 blocks a pillar at that spot. Put pillars somewhere else.' : 'Rope is cheap but weak. Steel is strong but costly.'],
   setup(L) {
@@ -1176,7 +1178,7 @@ NEW.S1 = {
   },
   start(L) { if (getHints().length) show('#btnHint', true); },
   showRound(L) {
-    const R = this.rounds[L.round]; L.R = R; L.deck = Array(R.gap).fill(null); L.pil = new Set(); L.ended = false; L.grp.clear(); L.objs = {};
+    const R = this.rounds[L.round]; L.R = R; L.deck = Array(R.gap).fill(null); L.pil = new Set(); L.mat = null; L.k = 0; L.blocked = []; L.ended = false; L.grp.clear(); L.objs = {};
     for (let x = 2 + R.gap; x <= 11; x++) for (let z = 1; z <= 3; z++) { mesh(M.grass, wx(x), -0.5, wz(z), 1, 1, 1, L.grp); mesh('dirt', wx(x), -1.5, wz(z), 1, 1, 1, L.grp); }
     R.block.forEach(b => { const f = mesh(new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6 }), wx(2) - 0.5 + b, -0.36, wz(2), 0.6, 0.04, 3, L.grp); f.userData.foam = 1; const s2 = sprite('🌊', 0.7); s2.position.set(wx(2) - 0.5 + b, 0.5, wz(3) + 0.6); L.grp.add(s2); });
     const fl = sprite('🏁', 0.8); fl.position.set(wx(2 + R.gap) + 0.3, 1.2, wz(1)); L.grp.add(fl);
@@ -1185,6 +1187,7 @@ NEW.S1 = {
     this.draw(L); this.render(L);
     say(L.round ? `Round ${L.round + 1}: ${R.gap} m river, ${R.who} weighs ${R.load} t${R.block.length ? '. Strong current in the middle 🌊' : ''}` : this.intro, 0);
   },
+  longCells(L) { const out = []; this.spans(L).forEach(([a, b]) => { for (let i = a; i < b; i++) { const m = L.deck[i]; if (m && b - a > this.mats[m].span) out.push(i); } }); return out; },
   cost(L) { return L.deck.reduce((a, m) => a + (m ? this.mats[m].cost : 0), 0) + L.pil.size * this.pillarCost; },
   spans(L) { const sup = [0, ...[...L.pil].sort((a, b) => a - b), L.R.gap]; const out = []; for (let i = 0; i + 1 < sup.length; i++) out.push([sup[i], sup[i + 1]]); return out; },
   // stress of each metre: max(load / strength, span length / max span) -> green < 0.75, yellow <= 1, red > 1 (breaks)
@@ -1201,35 +1204,43 @@ NEW.S1 = {
       else if (m === 'rope') { const span = sup.find((v, j) => j + 1 < sup.length && i >= v && i < sup[j + 1]); const nxt = sup[sup.indexOf(span) + 1]; const len = nxt - span; const sag = q => -0.25 * Math.sin(Math.PI * (q - span) / len);
         g.position.y = sag(i + 0.5); const rm = new THREE.MeshLambertMaterial({ color: '#c9a66b', emissive: '#000' }); for (let k = 0; k < 3; k++) mesh(rm, -0.33 + k * 0.33, 0, 0, 0.18, 0.06, 1.1, g);
         [-0.6, 0.6].forEach(dz => { const y0 = sag(i) - g.position.y + 0.5, y1 = sag(i + 1) - g.position.y + 0.5; const r = mesh(L.rope, 0, (y0 + y1) / 2, dz, 1.02, 0.05, 0.05, g); r.rotation.z = Math.atan2(y1 - y0, 1); mesh(L.rope, 0, (y0 + y1) / 4, dz, 0.03, (y0 + y1) / 2, 0.03, g); }); }
-      else { const gm = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, depthWrite: false }); mesh(gm, 0, 0, 0, 0.92, 0.05, 1.25, g); const t = sprite('➕', 0.4); t.position.y = 0.3; g.add(t); }
+      else { const gm = new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, depthWrite: false }); mesh(gm, 0, 0, 0, 0.92, 0.05, 1.25, g); }
       g.userData.deck = i; g.userData.y0 = g.position.y; g.traverse(o => { o.userData.deck = i; }); L.grp.add(g); L.objs['d' + i] = g; }
-    for (let b = 1; b < G; b++) { const x = wx(2) - 0.5 + b; const on = L.pil.has(b), blk = L.R.block.includes(b); const g = new THREE.Group(); g.position.set(x, 0, Z);
+    L.long = this.longCells(L); L.long.forEach(i => { const o = L.objs['d' + i]; if (!o) return; const w = mesh(new THREE.MeshBasicMaterial({ color: '#ff2d2d', transparent: true, opacity: 0.4, depthWrite: false }), 0, 0.12, 0, 1, 0.04, 1.4, o); w.userData.deck = i; });
+    if (L.long.length) { const mid = L.long[Math.floor(L.long.length / 2)]; const wt = sprite('⚠️', 0.6); wt.position.set(wx(2) + mid, 1.1, Z); L.grp.add(wt); L.objs.warn = wt; }
+    for (let b = 1; b < G; b++) { const x = wx(2) - 0.5 + b; const on = L.pil.has(b), blk = L.R.block.includes(b); if (!on && !blk) continue; const g = new THREE.Group(); g.position.set(x, 0, Z);
       if (on) { mesh('stone', 0, -0.55, 0, 0.42, 0.95, 0.9, g); mesh('stone', 0, -0.08, 0, 0.56, 0.12, 1.05, g); mesh('stone', 0, -0.98, 0, 0.6, 0.12, 1.1, g); }
       else { const gm = new THREE.MeshBasicMaterial({ color: blk ? '#ff4040' : '#ffd23f', transparent: true, opacity: blk ? 0.25 : 0.38, depthWrite: false }); mesh(gm, 0, -0.5, 0.75, 0.3, 0.9, 0.12, g); const t = sprite(blk ? '🌊' : '┃', 0.45); t.position.set(0, 0.35, 0.8); g.add(t); }
       g.traverse(o => { o.userData.pil = b; }); L.grp.add(g); L.objs['p' + b] = g; }
   },
+  // one material for the whole bridge + 0-3 evenly spaced pillars
+  pillarsFor(G, k) { const out = []; for (let j = 1; j <= k; j++) out.push(Math.round(G * j / (k + 1))); return out; },
+  choose(L, m, k) {
+    if (L.ended || L.locked) return; if (m !== undefined) L.mat = m; if (k !== undefined) L.k = k;
+    L.deck = L.deck.map(() => L.mat || null); L.pil = new Set(this.pillarsFor(L.R.gap, L.k || 0).filter(b => !L.R.block.includes(b)));
+    L.blocked = this.pillarsFor(L.R.gap, L.k || 0).filter(b => L.R.block.includes(b));
+    Sound.sfx(m !== undefined ? 'place' : 'push'); this.draw(L); this.render(L); if (L.mat) { const ln = this.longCells(L).length; say(ln ? '⚠️ A span is too long for ' + this.mats[L.mat].n + '. Add pillars ┃' : this.mats[L.mat].load < 0 ? '' : `${this.mats[L.mat].e} ${this.mats[L.mat].n} + ${L.pil.size} pillar${L.pil.size === 1 ? '' : 's'} = ₹${this.cost(L)}. Ready? Test drive! 🚚`, 0); }
+  },
   render(L) {
-    const R = L.R, c = this.cost(L), over = c > R.budget;
-    const strip = Array.from({ length: R.gap }, (_, i) => `<button class="sc" data-i="${i}" style="background:${L.deck[i] ? this.mats[L.deck[i]].col : '#ffffff55'}">${L.deck[i] ? this.mats[L.deck[i]].e : ''}</button>${i < R.gap - 1 ? `<button class="sp ${L.pil.has(i + 1) ? 'on' : ''} ${R.block.includes(i + 1) ? 'blk' : ''}" data-p="${i + 1}" title="pillar">${R.block.includes(i + 1) ? '🌊' : '┃'}</button>` : ''}`).join('');
-    panel(`<div class="bpanel"><b>🌉 ${L.round + 1}/${this.rounds.length}</b><span>${R.who} <b>${R.load} t</b></span><span>River <b>${R.gap} m</b></span><span class="${over ? 'bad' : ''}">💰 ₹${c} / ₹${R.budget}</span></div>
-      <div class="smats">${Object.entries(this.mats).map(([k, m]) => `<button class="sm ${L.mat === k ? 'sel' : ''}" data-m="${k}"><b class="si">${m.e}</b><span>${m.n}</span><small>💪 ${m.t} t</small><small>↔️ ${m.span} m</small><small>₹${m.cost}/m</small></button>`).join('')}<button class="sm fill" data-fill="1"><b class="si">🧱</b><span>Fill all</span><small>with ${this.mats[L.mat].n}</small></button></div>
-      <div class="sstrip"><span class="bank">⛰️</span>${strip}<span class="bank">⛰️</span></div><div class="small2">Tap a box to lay ${this.mats[L.mat].n} · tap ┃ for a pillar (₹${this.pillarCost})</div>
-      <div class="planks"><button class="pk undo2" data-clr="1">🧹 Clear</button><button class="pk go" data-g="1">🚚 Test drive!</button></div>`);
+    const R = L.R, c = this.cost(L), over = c > R.budget, k = L.k || 0;
+    panel(`<div class="bpanel"><b>🌉 Round ${L.round + 1}/${this.rounds.length}</b><span>${R.who} <b>${R.load} t</b></span><span>River <b>${R.gap} m</b></span><span>Budget <b>₹${R.budget}</b></span></div>
+      <div class="smats big">${Object.entries(this.mats).map(([key, m]) => `<button class="sm ${L.mat === key ? 'sel' : ''}" data-m="${key}"><b class="si">${m.e}</b><span>${m.n}</span><small>💪 holds ${m.t} t</small><small>↔️ max span ${m.span} m</small><small>💰 ₹${m.cost} per m</small></button>`).join('')}</div>
+      <div class="spil"><span>Pillars ┃ <small>(₹${this.pillarCost} each)</small></span>${[0, 1, 2, 3].map(n => `<button class="pk2 ${k === n ? 'sel' : ''}" data-k="${n}">${n}</button>`).join('')}</div>
+      <div class="sinfo">${L.mat ? `Spans: <b>${this.spans(L).map(([a, b]) => (b - a) + ' m').join(' + ')}</b>` : 'Pick a material 👆'}${L.blocked && L.blocked.length ? `<div class="swarn">🌊 Strong current at ${L.blocked.join(', ')} m: no pillar there! Choose another number.</div>` : ''}</div>
+      <div class="scost ${over ? 'bad' : ''}">Total: ₹${R.gap} m × ${L.mat ? '₹' + this.mats[L.mat].cost : '?'} + ${L.pil.size} × ₹${this.pillarCost} = <b>₹${c}</b> ${L.mat ? (over ? '❌ over budget' : `✅ ₹${R.budget - c} left`) : ''}</div>
+      <div class="planks"><button class="pk go" data-g="1" ${!L.mat || (L.blocked && L.blocked.length) ? 'disabled' : ''}>🚚 Test drive!</button></div>`.replace('₹' + R.gap + ' m', R.gap + ' m'));
     const P = $('#panel');
-    P.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { L.mat = b.dataset.m; Sound.sfx('click'); this.render(L); });
-    P.querySelector('[data-fill]').onclick = () => { if (L.ended) return; L.deck = L.deck.map(() => L.mat); Sound.sfx('place'); this.draw(L); this.render(L); };
-    P.querySelectorAll('[data-i]').forEach(b => b.onclick = () => this.setCell(L, +b.dataset.i));
-    P.querySelectorAll('[data-p]').forEach(b => b.onclick = () => this.togglePillar(L, +b.dataset.p));
-    P.querySelector('[data-clr]').onclick = () => { if (L.ended) return; L.deck = L.deck.map(() => null); L.pil.clear(); Sound.sfx('click'); this.draw(L); this.render(L); };
+    P.querySelectorAll('[data-m]').forEach(b => b.onclick = () => this.choose(L, b.dataset.m));
+    P.querySelectorAll('[data-k]').forEach(b => b.onclick = () => this.choose(L, undefined, +b.dataset.k));
     P.querySelector('[data-g]').onclick = () => this.go(L);
   },
   setCell(L, i, m) { if (L.ended || L.locked) return; m = m || L.mat; L.deck[i] = L.deck[i] === m ? null : m; Sound.sfx('place'); this.draw(L); const o = L.objs['d' + i]; if (o) { const y0 = o.position.y; o.position.y = 0.8; tween(0.2, k => o.position.y = 0.8 + (y0 - 0.8) * k); } this.render(L); },
   togglePillar(L, b) { if (L.ended || L.locked) return; if (L.R.block.includes(b)) { Sound.sfx('bump'); say('The current is too strong there 🌊 Put the pillar somewhere else.', 2500); return; } if (L.pil.has(b)) L.pil.delete(b); else L.pil.add(b); Sound.sfx('push'); this.draw(L); this.render(L); },
-  onPointer(L, ray) { const hit = ray.intersectObjects(Object.values(L.objs || {}), true).find(h => h.object.userData.deck !== undefined || h.object.userData.pil); if (!hit) return true; const u = hit.object.userData; if (u.deck !== undefined) this.setCell(L, u.deck); else if (u.pil) this.togglePillar(L, u.pil); return true; },
+  onPointer(L, ray) { return true; },
   async go(L) {
     if (L.ended || L.locked) return; const R = L.R;
-    if (L.deck.some(m => !m)) { Sound.sfx('bump'); say('Some metres have no bridge yet! Fill every gap first 🧱', 2500); return; }
-    const c = this.cost(L); if (c > R.budget) { Sound.sfx('bump'); say(`Over budget! ₹${c} is more than ₹${R.budget}. Try cheaper materials or fewer pillars 💰`, 3500); return; }
+    if (L.deck.some(m => !m)) { Sound.sfx('bump'); say('Pick a material first 👆', 2500); return; }
+    const c = this.cost(L); if (c > R.budget) { Sound.sfx('bump'); L.rec.fails++; L.rec.firstTry = false; say(`💰 Over budget! ₹${c} is more than ₹${R.budget}. Try a cheaper material or fewer pillars.`, 0); return; }
     L.ended = true; L.locked = true; const st = this.stress(L); const sp = this.spans(L);
     const brk = sp.find(([a, b]) => { for (let i = a; i < b; i++) if (st[i] > 1) return true; return false; });
     const t = L.truck; const xs = wx(2) - 0.5; Sound.sfx('push');
@@ -1244,7 +1255,7 @@ NEW.S1 = {
       snapped = true; Sound.sfx('crumble'); shake(0.3); const [a, b] = brk; for (let i = a; i < b; i++) { const o = L.objs['d' + i]; tween(0.6, k => { o.position.y = o.userData.y0 - k * 1.4; o.rotation.z = (i - (a + b) / 2) * k * 0.4; }); }
       await new Promise(r => tween(0.6, k => { t.position.y = -k * 1.3; t.rotation.z = -k * 0.7; }, r)); Sound.sfx('splash'); burst(t.position.clone().setY(0), '#7cc4ff', 24);
       const mk = sprite('❌', 0.9); mk.position.set(xs + (a + b) / 2, 1.4, wz(2)); L.grp.add(mk);
-      const weak = (() => { for (let i = a; i < b; i++) { const M2 = this.mats[L.deck[i]]; if (R.load > M2.t) return `${M2.n} holds only ${M2.t} t, but the ${R.who.split(' ').slice(1).join(' ')} is ${R.load} t. Use something stronger!`; if (b - a > M2.span) return `That span is ${b - a} m, but ${M2.n} can only reach ${M2.span} m. Add a pillar ┃!`; } return 'That part was too weak.'; })();
+      const weak = (() => { for (let i = a; i < b; i++) { const M2 = this.mats[L.deck[i]]; if (R.load > M2.t) return `Too weak: ${M2.n} holds ${M2.t} t, the truck is ${R.load} t.`; if (b - a > M2.span) return `Span too long: ${b - a} m, but ${M2.n} reaches only ${M2.span} m. Add pillars ┃`; } return 'That part was too weak.'; })();
       failLevel(`Snap! 💥 ${weak}`); await sleep(1600); L.grp.remove(mk); t.rotation.set(0, 0, 0); t.position.set(wx(0.6), 0, wz(2)); L.ended = false; L.locked = false; this.draw(L); this.render(L); say(`💥 ${weak}`, 0); return;
     }
     const saved = R.budget - c; L.saved.push(saved / R.budget); L.wins++; Sound.sfx('win'); confetti(50);
@@ -1549,8 +1560,8 @@ NEW.S1,
   hints: ['Look at the picture row by row and say the colours in your head 🧠', 'Green ✅ = right colour. Tap a square again to change it.', 'Peek 👀 costs 8 seconds. Use it when you are stuck.', 'Mirror round: left becomes right, like in a mirror 🪞'],
   cols: { R: ['#e53935', 'Red'], Y: ['#ffd23f', 'Yellow'], B: ['#3b82f6', 'Blue'], G: ['#2fa86b', 'Green'], O: ['#f26b21', 'Orange'], W: ['#f5f5f5', 'White'], P: ['#b46bff', 'Purple'] },
   peekCost: 8, showSec: 5,
-  pats: [{ name: 'Mango Tile', time: 45, g: ['GYG', 'YOG', 'GGY'], decoy: 'BR' }, { name: 'Kite', time: 60, g: ['BRRB', 'RYYR', 'RYOR', 'BRRB'], decoy: 'GW' }, { name: 'Mirror Flag', time: 70, mirror: true, g: ['ORRY', 'OBRY', 'OBBY', 'GGGY'], decoy: 'PW' }],
-  tracks: { '7-8': { pats: [{ name: 'Kite', time: 55, g: ['BRRB', 'RYYR', 'RYOR', 'BRRB'], decoy: 'GWP' }, { name: 'Rangoli', time: 75, g: ['OGPGO', 'GPYPG', 'PYRYP', 'GPYPG', 'OGPGO'], decoy: 'WB' }, { name: 'Mirror Fort', time: 90, mirror: true, g: ['RRYBB', 'ROYGB', 'OOYGG', 'ROYGB', 'RRYBB'], decoy: 'WP' }] } },
+  pats: [{ name: 'Mango Tile', time: 60, g: ['GYG', 'YOG', 'GGY'], decoy: 'BR' }, { name: 'Kite', time: 75, g: ['BRRB', 'RYYR', 'RYOR', 'BRRB'], decoy: 'GW' }, { name: 'Mirror Flag', time: 85, mirror: true, g: ['ORRY', 'OBRY', 'OBBY', 'GGGY'], decoy: 'PW' }],
+  tracks: { '7-8': { pats: [{ name: 'Kite', time: 70, g: ['BRRB', 'RYYR', 'RYOR', 'BRRB'], decoy: 'GWP' }, { name: 'Rangoli', time: 90, g: ['OGPGO', 'GPYPG', 'PYRYP', 'GPYPG', 'OGPGO'], decoy: 'WB' }, { name: 'Mirror Fort', time: 105, mirror: true, g: ['RRYBB', 'ROYGB', 'OOYGG', 'ROYGB', 'RRYBB'], decoy: 'WP' }] } },
   setup(L) {
     L.round = -1; L.results = []; L.mat = null; L.grp = new THREE.Group(); world.add(L.grp);
     mesh('stone', wx(7.5), 0.4, wz(3), 2.6, 0.8, 0.6); L.stand = new THREE.Group(); L.stand.position.set(wx(7.5), 2.3, wz(3)); world.add(L.stand);
@@ -1874,13 +1885,13 @@ async function grandFinale() {
   const last = ISL.length - 1, P = ISL[last].pos.clone(); ISL.forEach((s2, i) => { s2.flame.visible = i < last; s2.lock.visible = false; setSign(i, 'done'); setBridge(i, true); });
   const g = new THREE.Group(); g.position.copy(P).add(new THREE.Vector3(0, 0, -0.6)); overworld.add(g);
   player.g.visible = true; player.queue = []; player.moving = false; player.g.position.copy(P).add(new THREE.Vector3(1.5, 0, 1.2)); player.face = 0; player.g.rotation.y = 0;
-  mesh('stone', 0, 0.4, 0, 1.6, 0.8, 1.6, g); mesh('log', 0, 2.4, 0, 0.6, 3.4, 0.6, g); mesh(M.gold, 0, 4.2, 0, 1.8, 0.5, 1.8, g);
+  mesh('stone', 0, 0.4, 0, 1.6, 0.8, 1.6, g); mesh('stone', 0, 0.95, 0, 1.2, 0.3, 1.2, g); mesh('log', 0, 2.4, 0, 0.6, 3.4, 0.6, g); [1.4, 3.2].forEach(y => mesh(M.gold, 0, y, 0, 0.7, 0.12, 0.7, g)); mesh(M.gold, 0, 4.0, 0, 1.3, 0.3, 1.3, g); mesh(M.gold, 0, 4.25, 0, 1.8, 0.3, 1.8, g); g.scale.setScalar(camera.aspect < 0.8 ? 1.2 : 1.5); if (ISL[last].sign) ISL[last].sign.visible = false;
   const fire = new THREE.Group(); fire.position.y = 4.5; g.add(fire); fire.scale.setScalar(0.01);
   [['#ff4f1a', 1.5, 0.9], ['#ff8a1a', 1.1, 1.6], ['#ffd23f', 0.7, 2.2], ['#fff3b0', 0.35, 2.6]].forEach(([c, w, h]) => { const f = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: c })); f.scale.set(w, h, w); f.position.y = h / 2; f.rotation.y = w; fire.add(f); });
   const light = new THREE.PointLight('#ffb35a', 0, 80); light.position.set(0, 7, 0); g.add(light);
-  MC.follow = false; MC.target.copy(P).add(new THREE.Vector3(0, camera.aspect < 0.8 ? 6 : 5, 0)); const d0 = MC.dist; MC.dist = camera.aspect < 0.8 ? 17 : 12;
+  MC.follow = false; MC.target.copy(P).add(new THREE.Vector3(0, camera.aspect < 0.8 ? 6 : 7, 0)); const d0 = MC.dist; MC.dist = camera.aspect < 0.8 ? 17 : 17;
   camera.position.copy(P).add(new THREE.Vector3(0, 30, 24)); MC.look.copy(MC.target); // fly in from above
-  const ov = document.createElement('div'); ov.id = 'finale'; ov.innerHTML = '<div class="fin-t">THE GREAT TORCH IS LIT! 🔥</div><div class="fin-s">You brought the light back to every island of Promethia ✨</div><div class="fin-tap">tap to continue</div>'; document.body.appendChild(ov);
+  const ov = document.createElement('div'); ov.id = 'finale'; ov.innerHTML = '<div class="fin-t">THE GREAT TORCH IS LIT! 🔥</div><div class="fin-s">You brought the light back to every island of Promethia ✨</div><div class="fin-tap">' + pcWords('tap to continue') + '</div>'; document.body.appendChild(ov);
   let skip; const skipP = new Promise(r => skip = r); ov.onclick = () => skip();
   const wait = ms => Promise.race([sleep(ms), skipP]);
   ov.classList.add('top'); await fade(false); await wait(1600);
@@ -1889,7 +1900,8 @@ async function grandFinale() {
   if (!(scene.background && scene.background.isColor)) scene.background = new THREE.Color('#7ec8ff'); const sky0 = scene.background.clone(), sky1 = new THREE.Color('#ffcf8a'); tween(1.5, k => { scene.background.copy(sky0).lerp(sky1, k); if (scene.fog) scene.fog.color.copy(scene.background); });
   ISL.forEach((s2, i) => setTimeout(() => { s2.flame.visible = true; burst(s2.flame.getWorldPosition(new THREE.Vector3()), '#ffd23f', 14, 2); }, 300 + i * 90));
   ov.classList.add('show'); window.__pqTorchClose = true; await wait(2400); window.__pqTorchClose = false;
-  ov.classList.remove('top'); MC.dist = camera.aspect < 0.8 ? 46 : 36; MC.target.set(0, 0, camera.aspect < 0.8 ? 4 : 0); Sound.sfx('win'); setTimeout(() => Sound.sfx('star'), 700); confetti(120); setTimeout(() => confetti(80), 1500);
+  // stay on the torch: pull back a little so the neighbouring lit islands show too, title stays at the top
+  ov.classList.add('sub'); MC.dist = camera.aspect < 0.8 ? 26 : 24; MC.target.copy(P).add(new THREE.Vector3(0, 7.5, 0)); Sound.sfx('win'); setTimeout(() => Sound.sfx('star'), 700); confetti(120); setTimeout(() => confetti(80), 1500);
   window.__pqFinale = true; await wait(2600); ov.classList.add('out'); await sleep(400); ov.remove(); MC.dist = d0; MC.follow = true; fire.scale.setScalar(1.2);
 }
 async function finishGame() {
