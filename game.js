@@ -583,7 +583,7 @@ function bandFor(grade) { return (+grade >= 7) ? '7-8' : '5-6'; }
 function trackDef(base) { const o = base.tracks && base.tracks[S.band]; return o ? Object.assign(Object.create(base), o) : base; }
 function newRec(def) { return { id: def.id, name: def.name, skill: def.skill, t0: now(), time: 0, attempts: 1, fails: 0, hints: 0, stars: 0, explore: 0, embers: 0, steps: 0, completed: false, skipped: false, firstTry: true, extra: {} }; }
 async function startLevel(i) {
-  S.idx = i; const def = trackDef(LEVELS[i]);
+  S.idx = i; const def = trackDef(LEVELS[i]); document.body.dataset.level = def.id;
   await fade(true); show('#mapUI', false);
   ['#btnHint', '#btnSkip', '#btnReset', '#btnAct', '#buildBar', '#hearts', '#panel'].forEach(s => show(s, false)); $('#btnAct').onclick = null;
   setMode('level'); player.g.position.y = 0;
@@ -763,7 +763,10 @@ NEW.N1 = {
   intro: 'Robo is learning! 🤖 Show Robo where the food above its head belongs: walk onto the matching bin.',
   goal: 'Teach Robo: walk onto the right bin',
   hints: ['Look closely at the food above Robo. What color is it?', 'Each bin has a color sign. Which one fits the food?', 'Robots learn from the examples YOU give them 🤖'],
-  items: [['🍎', 'R'], ['🍌', 'Y'], ['🍓', 'R'], ['🌽', 'Y'], ['🍒', 'R']], tests: [['🍋', 'Y'], ['🌶️', 'R']],
+  items: [['🍎', 'R'], ['🍌', 'Y'], ['🍓', 'R'], ['🌽', 'Y'], ['🍒', 'R']], tests: [['🍋', 'Y'], ['🌶️', 'R']], binLabels: { R: ['🟥', 'red bin'], Y: ['🟨', 'yellow bin'] },
+  tracks: { '7-8': { intro: 'Robo is learning! 🤖 Is the thing above its head LIVING or NON-LIVING? Walk onto the right bin to teach Robo.', goal: 'Teach Robo: living 🌱 or non-living 🪨',
+    hints: ['Does it grow, breathe and need food? Then it is living 🌱', 'A thing that never grows or breathes is non-living 🪨', 'Robots learn from the examples YOU give them 🤖'],
+    items: [['🐕', 'R'], ['🪨', 'Y'], ['🍄', 'R'], ['🚲', 'Y'], ['🌳', 'R']], tests: [['🐟', 'R'], ['🪑', 'Y']], binLabels: { R: ['🌱', 'living'], Y: ['🪨', 'non-living'] } } },
   solid: c => c.t === 'R',
   setup(L) {
     L.i = 0; L.bins = {};
@@ -771,19 +774,22 @@ NEW.N1 = {
       if (c.t === 'R') L.bot = makeBot(c);
       if (c.t === 'A' || c.t === 'B') { const col = c.t === 'A' ? '#e53935' : '#fdd835'; c.bin = c.t === 'A' ? 'R' : 'Y'; addPad(c, col);
         const box = mesh(new THREE.MeshLambertMaterial({ color: col }), wx(c.x), 0.35, wz(c.z) - 0.9, 0.9, 0.7, 0.4); box.castShadow = true;
-        const sg = cardSprite(c.t === 'A' ? '🟥' : '🟨', c.t === 'A' ? 'red bin' : 'yellow bin', 1.0); sg.position.set(wx(c.x), 1.5, wz(c.z) - 0.9); world.add(sg); L.bins[c.bin] = c; }
+        const bl = this.binLabels[c.bin]; const sg = cardSprite(bl[0], bl[1], 1.0); sg.position.set(wx(c.x), 1.5, wz(c.z) - 0.9); world.add(sg); L.bins[c.bin] = c; box.userData.bin = sg.userData.bin = c; L.binObjs = (L.binObjs || []).concat([box, sg]); }
     }
     panel(`<div class="pbig">🤖 Teaching Robo: <b id="n1c">0</b> / ${this.items.length}</div>`);
     this.showItem(L);
   },
-  showItem(L) { if (L.item) world.remove(L.item); const it = this.items[L.i]; L.item = cardSprite(it[0], '', 1.0); L.item.position.set(wx(5), 2.4, wz(1)); world.add(L.item); if (L.i) say(`Next food for Robo: ${it[0]}`, 0); },
+  // tapping the bin box or its sign walks onto that bin's pad (v3 fix: before, taps on the box picked the cell behind it)
+  onPointer(L, ray) { if (!L.binObjs || L.testing) return false; const hit = ray.intersectObjects(L.binObjs, false)[0]; if (!hit) return false; const c = hit.object.userData.bin;
+    if (player.x === c.x && player.z === c.z) { say('You are on this bin. Step off, then walk on again 👣', 2500); return true; } const pth = findPath(c.x, c.z); if (pth) player.queue = pth; return true; },
+  showItem(L) { L.wait = false; if (L.item) world.remove(L.item); const it = this.items[L.i]; L.item = cardSprite(it[0], '', 1.0); L.item.position.set(wx(5), 2.4, wz(1)); world.add(L.item); if (L.i) say(`Next food for Robo: ${it[0]}`, 0); },
   onEnter(c) {
-    if (!c.bin || L.testing || L.i >= this.items.length) return; const it = this.items[L.i];
+    if (!c.bin || L.testing || L.wait || L.i >= this.items.length) return; const it = this.items[L.i];
     if (c.bin === it[1]) {
       Sound.sfx('good'); const o = L.item; L.item = null; const a = o.position.clone(), b = new THREE.Vector3(wx(c.x), 0.6, wz(c.z) - 0.9);
       tween(0.5, k => { o.position.lerpVectors(a, b, k); o.position.y += Math.sin(k * Math.PI); }, () => { world.remove(o); burst(b, '#ffd23f', 10); });
       L.i++; $('#n1c').textContent = L.i; botHop(L.bot);
-      if (L.i >= this.items.length) this.robotTest(L); else setTimeout(() => this.showItem(L), 600);
+      if (L.i >= this.items.length) this.robotTest(L); else { L.wait = true; setTimeout(() => { this.showItem(L); if (this.items[L.i][1] === c.bin && player.x === c.x && player.z === c.z) say(`Next food for Robo: ${this.items[L.i][0]} Step off the bin, then walk on again 👣`, 0); }, 600); }
     } else failLevel('Hmm, Robo looks confused 🤖❓ Look at the food again!');
   },
   async robotTest(L) {
@@ -923,6 +929,8 @@ NEW.N5 = {
   map: ['###########', '#....R....#', '#..1.2.3..#', '#.........#', '#..4.5.6..#', '#....S...x#', '#####E#####'],
   rounds: [[['🐱', 'cat', 1], ['🐶', 'cat', 0, 'dog'], ['🐟', 'fish', 1], ['🐦', 'fish', 0, 'bird'], ['🐮', 'cow', 1], ['🐸', 'frog', 1]],
            [['🚗', 'car', 1], ['🍎', 'car', 0, 'apple'], ['🚲', 'bike', 1], ['🍌', 'banana', 1], ['✈️', 'banana', 0, 'plane'], ['⚽', 'ball', 1]]],
+  tracks: { '7-8': { rounds: [[['🐋', 'fish', 0, 'mammal'], ['🦈', 'fish', 1], ['🦇', 'bird', 0, 'mammal'], ['🐧', 'bird', 1], ['🐍', 'reptile', 1], ['🐸', 'reptile', 0, 'amphibian']],
+    [['🌍', 'planet', 1], ['🌙', 'planet', 0, 'moon'], ['☀️', 'star', 1], ['🪐', 'planet', 1], ['☄️', 'star', 0, 'comet'], ['🌕', 'moon', 1]]] } },
   intro: 'Robo put name labels on these pictures, but some labels are WRONG! 🔧 Walk onto each WRONG card to fix it.',
   goal: 'Find and fix the wrong labels',
   hints: ['Read each label, then look at its picture. Do they match?', 'AI can make mistakes. People check its work! 🕵️'],
@@ -1032,14 +1040,22 @@ NEW.P1 = {
   art(p) { const c = document.createElement('canvas'); c.width = 360; c.height = 360 * p.r / p.c; const g = c.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, c.height); gr.addColorStop(0, '#6ec6ff'); gr.addColorStop(0.62, '#bfe9ff'); gr.addColorStop(0.62, '#5cb85c'); gr.addColorStop(1, '#3f8f35'); g.fillStyle = gr; g.fillRect(0, 0, c.width, c.height);
     g.font = '96px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(p.art[0], c.width * 0.5, c.height * 0.55); g.font = '60px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.fillText(p.art[1], c.width * 0.85, c.height * 0.18); g.fillText(p.art[2], c.width * 0.15, c.height * 0.7); return c.toDataURL(); },
   async start(L) {
+    await modal(`<h2>How to play 🧩</h2><div class="jdemo"><div class="jd" id="jd0">1</div><div class="jd" id="jd1">2</div><div class="jd" id="jd2">3</div><span class="jfinger" id="jf">👆</span></div><p class="story-text" id="jdSay" style="font-size:19px">Tap one piece…</p><button class="btn primary" id="jdGo">Got it! ▶</button>`, (el, done) => {
+      const t = [], f = el.querySelector('#jf'), d0 = el.querySelector('#jd0'), d2 = el.querySelector('#jd2'), say2 = el.querySelector('#jdSay'); let fin = false;
+      const run = () => { d0.textContent = '3'; d2.textContent = '1'; d0.className = d2.className = 'jd'; f.className = 'jfinger p0'; say2.textContent = 'Tap one piece…';
+        t.push(setTimeout(() => { d0.classList.add('sel'); Sound.sfx('click'); }, 700), setTimeout(() => { f.className = 'jfinger p2'; say2.textContent = '…then tap where it should go'; }, 1100),
+          setTimeout(() => { d2.classList.add('sel'); Sound.sfx('click'); }, 1800), setTimeout(() => { d0.textContent = '1'; d2.textContent = '3'; d0.className = d2.className = 'jd ok swap'; Sound.sfx('good'); say2.textContent = 'They swap! ✨ Make the whole picture right.'; }, 2200), setTimeout(() => { if (!fin) run(); }, 3800)); };
+      run(); el.querySelector('#jdGo').onclick = () => { fin = true; t.forEach(clearTimeout); done(); };
+    });
     for (let i = 0; i < this.puzzles.length; i++) {
       const p = this.puzzles[i], n = p.c * p.r, url = this.art(p); let ord; do ord = shuffle([...Array(n).keys()]); while (ord.every((v, k) => v === k));
       say(i ? 'Puzzle 2! A bit bigger 🧩' : this.intro, 0); const t0 = now();
-      const res = await modal(`<h2>🧩 Puzzle ${i + 1} of ${this.puzzles.length}</h2><div class="jtop"><img src="${url}" class="jpeek" alt="the picture"><span id="jTime">⏱️ ${p.time}s</span></div><div id="jig" style="grid-template-columns:repeat(${p.c},1fr);aspect-ratio:${p.c}/${p.r}"></div><p class="small" id="jTip">Tap a piece, then tap another to swap.</p>`, (el, done) => {
+      const res = await modal(`<h2>🧩 Puzzle ${i + 1} of ${this.puzzles.length}</h2><div class="jtop"><img src="${url}" class="jpeek" alt="the picture"><span id="jTime">⏱️ ${p.time}s</span></div><div id="jig" style="grid-template-columns:repeat(${p.c},1fr);aspect-ratio:${p.c}/${p.r}"></div><p class="small" id="jTip">Tap a piece, then tap another to swap.</p><div id="jDone" class="hidden"><div class="jdone">Done! ✓</div><button class="btn primary huge" id="jNext">${i + 1 < this.puzzles.length ? 'Next ▶' : 'Finish level ▶'}</button></div>`, (el, done) => {
         const box = el.querySelector('#jig'); let sel = -1, fin = false;
         const draw = () => { box.innerHTML = ord.map((v, k) => `<button class="jp ${k === sel ? 'sel' : ''} ${v === k ? 'ok' : ''}" data-k="${k}" data-v="${v}" style="background-image:url(${url});background-size:${p.c * 100}% ${p.r * 100}%;background-position:${(v % p.c) / (p.c - 1) * 100}% ${(Math.floor(v / p.c)) / (p.r - 1) * 100}%"></button>`).join('');
-          box.querySelectorAll('.jp').forEach(b => b.onclick = () => { if (fin) return; const k = +b.dataset.k; if (sel < 0) { sel = k; Sound.sfx('click'); } else { [ord[sel], ord[k]] = [ord[k], ord[sel]]; sel = -1; Sound.sfx(ord[k] === k ? 'good' : 'place'); if (ord.every((v, q) => v === q)) { fin = true; clearInterval(iv); Sound.sfx('win'); box.classList.add('done'); setTimeout(() => done(true), 900); } } draw(); }); };
-        const iv = setInterval(() => { const left = Math.max(0, Math.ceil(p.time - (now() - t0))); const e = el.querySelector('#jTime'); if (e) { e.textContent = `⏱️ ${left}s`; e.classList.toggle('low', left < 15); } if (left <= 0 && !fin) { fin = true; clearInterval(iv); ord = [...Array(n).keys()]; draw(); el.querySelector('#jTip').textContent = 'Time! Here is the picture. Well tried! 👏'; setTimeout(() => done(false), 1600); } }, 250);
+          box.querySelectorAll('.jp').forEach(b => b.onclick = () => { if (fin) return; const k = +b.dataset.k; if (sel < 0) { sel = k; Sound.sfx('click'); } else { [ord[sel], ord[k]] = [ord[k], ord[sel]]; sel = -1; Sound.sfx(ord[k] === k ? 'good' : 'place'); if (ord.every((v, q) => v === q)) { fin = true; clearInterval(iv); Sound.sfx('win'); confetti(40); box.classList.add('done'); finish(true); } } draw(); }); };
+        const finish = ok => { const d = el.querySelector('#jDone'); if (!ok) d.querySelector('.jdone').textContent = 'Well tried! 👏'; d.classList.remove('hidden'); el.querySelector('#jTip').classList.add('hidden'); el.querySelector('#jNext').onclick = () => { Sound.sfx('click'); done(ok); }; };
+        const iv = setInterval(() => { const left = Math.max(0, Math.ceil(p.time - (now() - t0))); const e = el.querySelector('#jTime'); if (e) { e.textContent = `⏱️ ${left}s`; e.classList.toggle('low', left < 15); } if (left <= 0 && !fin) { fin = true; clearInterval(iv); ord = [...Array(n).keys()]; draw(); finish(false); } }, 250);
         draw();
       });
       L.results.push({ ok: res, sec: Math.round(now() - t0) }); if (!res) { L.rec.fails++; L.rec.firstTry = false; } else confetti(30);
@@ -1061,7 +1077,20 @@ NEW.O1 = {
   hints: ['Start at the edge and go row by row, like a snake 🐍', 'Do not leave a tile alone in a corner!', 'Stuck? It restarts by itself. Try a new way 🔄'],
   solid: c => L && L.allowed && (!L.allowed.has(c.x + ',' + c.z) || L.vis.has(c.x + ',' + c.z)),
   setup(L) { L.round = 0; L.grp = new THREE.Group(); world.add(L.grp); this.showRound(L); },
-  start(L) { this.place(L); },
+  async start(L) {
+    L.locked = true;
+    await modal(`<h2>How to play 〰️</h2><div class="odemo">${[0, 1, 2, 3].map(i => `<div class="ot" id="ot${i}"></div>`).join('')}<span class="oghost" id="og">🧍</span><span class="ox hidden" id="ox">❌</span></div><p class="story-text" id="oSay" style="min-height:52px;font-size:19px"></p><button class="btn" id="oAgain" style="background:#ddd;color:#1a2a4f">↻ Show again</button> <button class="btn primary" id="oGo" disabled>Got it, let me try ▶</button>`, (el, done) => {
+      const pos = [[0, 0], [1, 0], [1, 1], [0, 1]], g = el.querySelector('#og'), x = el.querySelector('#ox'), sayE = el.querySelector('#oSay'); let alive = true;
+      const at = (i, c) => { g.style.left = (pos[i][0] * 92 + 18) + 'px'; g.style.top = (pos[i][1] * 92 + 14) + 'px'; if (c) { el.querySelector('#ot' + i).classList.add('used'); Sound.tone(440 + i * 120, 0.12, 'triangle', 0.18); } };
+      const run = async () => { el.querySelector('#oGo').disabled = true; [0, 1, 2, 3].forEach(i => el.querySelector('#ot' + i).className = 'ot'); x.classList.add('hidden'); sayE.textContent = 'Walk on a bright tile…'; at(0, true);
+        for (const i of [1, 2]) { await sleep(800); if (!alive) return; at(i, true); }
+        await sleep(800); if (!alive) return; sayE.innerHTML = '<b style="color:#d6201f">Can\'t step twice! ❌</b>'; g.style.top = (pos[1][1] * 92 + 40) + 'px'; x.style.left = (pos[1][0] * 92 + 26) + 'px'; x.style.top = (pos[1][1] * 92 + 20) + 'px'; x.classList.remove('hidden'); Sound.sfx('wrong');
+        await sleep(1200); if (!alive) return; x.classList.add('hidden'); at(2); await sleep(400); at(3, true); Sound.sfx('good');
+        sayE.innerHTML = '<b>Step on every bright tile once, never twice</b> ✨'; await sleep(400); el.querySelector('#oGo').disabled = false; };
+      el.querySelector('#oAgain').onclick = run; el.querySelector('#oGo').onclick = () => { alive = false; done(); }; run();
+    });
+    L.locked = false; this.place(L); say(this.intro, 0);
+  },
   showRound(L) {
     const [[x0, z0, w, h, hole], st] = this.P[this.order[L.round]]; L.allowed = new Set(); L.vis = new Set(); L.tiles = {}; L.grp.clear(); L.st = st;
     for (let z = 1; z <= 5; z++) for (let x = 1; x <= 9; x++) { const inR = x >= x0 && x < x0 + w && z >= z0 && z < z0 + h && !(hole && x === x0 + 1 && z === z0 + 1); const k = x + ',' + z;
@@ -1115,35 +1144,97 @@ NEW.G1 = {
 
 /* ---------- S1 Setu Builder + Truck Rescue (maths/planning, hard) ---------- */
 NEW.S1 = {
-  id: 'S1', name: 'Setu Builder', emoji: '🌉', skill: 'logic', skillLabel: 'Bridge + Truck Rescue', noWalk: true, ownTimer: true,
-  map: ['.............', '..zzzzzzzzz..', '..zzzzzzzzz..', '..zzzzzzzzz..', '.............'],
-  rounds: [{ gap: 5, planks: { 3: 1, 2: 2 } }, { gap: 7, planks: { 3: 1, 2: 3, 4: 1 } }, { gap: 8, planks: { 3: 2, 2: 2, 4: 1 } }],
-  tracks: { '7-8': { rounds: [{ gap: 7, planks: { 3: 1, 2: 3, 4: 1 } }, { gap: 8, planks: { 3: 2, 2: 1, 5: 1 } }, { gap: 9, planks: { 4: 1, 2: 3, 5: 1 } }] } },
-  intro: 'A truck full of mangoes 🥭🚚 is stuck! Build a setu (bridge) that fits the river EXACTLY.',
-  goal: 'Pick planks that add up to the river width',
-  hints: L => [`The river is ${L.R ? L.R.gap : ''} m wide. Which planks add up to that? ➕`, 'Too short and the truck falls. Too long will not fit! 📏', 'Try the biggest plank first, then fill the rest 🧠'],
-  setup(L) { L.round = 0; L.wins = 0; L.grp = new THREE.Group(); world.add(L.grp);
-    const w = new THREE.Mesh(BOX, M.water); w.scale.set(9, 0.1, 3); w.position.set((wx(2) + wx(10)) / 2, -0.4, wz(2)); world.add(w);
-    const t = new THREE.Group(); mesh(new THREE.MeshLambertMaterial({ color: '#f26b21' }), 0, 0.55, 0, 1.3, 0.6, 0.7, t); mesh(new THREE.MeshLambertMaterial({ color: '#1a2a4f' }), 0.8, 0.5, 0, 0.45, 0.5, 0.7, t); [[-0.4, 0.38], [0.4, 0.38], [-0.4, -0.38], [0.4, -0.38], [0.8, 0.38], [0.8, -0.38]].forEach(([x, z]) => mesh(M.dark, x, 0.18, z, 0.3, 0.3, 0.1, t)); const s2 = sprite('🥭', 0.5); s2.position.set(0, 1.1, 0); t.add(s2); world.add(t); L.truck = t; this.showRound(L); },
-  showRound(L) { const R = this.rounds[L.round]; L.R = R; L.left = { ...R.planks }; L.used = []; L.grp.clear(); L.ended = false; L.tLeft = 90;
-    for (let x = 2 + R.gap; x <= 10; x++) for (let z = 1; z <= 3; z++) { mesh(M.grass, wx(x), -0.5, wz(z), 1, 1, 1, L.grp); mesh('dirt', wx(x), -1.5, wz(z), 1, 1, 1, L.grp); }
+  id: 'S1', name: 'Setu Builder', emoji: '🌉', skill: 'logic', skillLabel: 'Bridge + Truck Rescue (hard)', noWalk: true,
+  map: ['..............', '..zzzzzzzzzz..', '..zzzzzzzzzz..', '..zzzzzzzzzz..', '..............'],
+  mats: { wood: { e: '🪵', n: 'Wood', t: 1, span: 3, cost: 100, col: '#b5834c' }, steel: { e: '🔩', n: 'Steel', t: 3, span: 4, cost: 300, col: '#8f9bab' }, rope: { e: '🪢', n: 'Rope', t: 0.5, span: 5, cost: 40, col: '#d9c08a' } },
+  pillarCost: 250,
+  rounds: [{ gap: 6, load: 0.5, who: '🛒 mango cart', budget: 900, block: [] }, { gap: 8, load: 2, who: '🚚 mango truck', budget: 3200, block: [] }, { gap: 10, load: 2.5, who: '🚛 heavy truck', budget: 3800, block: [5] }],
+  tracks: { '7-8': { rounds: [{ gap: 6, load: 0.5, who: '🛒 mango cart', budget: 700, block: [] }, { gap: 8, load: 2, who: '🚚 mango truck', budget: 2800, block: [] }, { gap: 10, load: 2.5, who: '🚛 heavy truck', budget: 3600, block: [5] }], hints: [] } },
+  intro: 'Build a real setu (bridge)! 🌉 Pick a material, tap each metre of the bridge, and add pillars ┃ if a span is too long.',
+  goal: 'Strong enough, every span short enough, and under budget',
+  hints: L => [`The ${L.R ? L.R.who : 'truck'} weighs ${L.R ? L.R.load : ''} t. Pick a material that holds at least that much 💪`, 'Each material can only reach so far between supports (max span). Add a pillar ┃ to split a long span.', 'Cheaper is better, but it must not break! Check the budget 💰', L.R && L.R.block.length ? 'The strong current 🌊 blocks a pillar at that spot. Put pillars somewhere else.' : 'Rope is cheap but weak. Steel is strong but costly.'],
+  setup(L) {
+    L.round = 0; L.wins = 0; L.saved = []; L.grp = new THREE.Group(); world.add(L.grp); L.mat = 'wood';
+    const w = new THREE.Mesh(BOX, M.water); w.scale.set(10, 0.1, 3); w.position.set((wx(2) + wx(11)) / 2, -0.45, wz(2)); world.add(w);
+    [[0.3, 0.5], [1.2, 3.6], [12.6, 0.4], [13.4, 3.4], [1.6, 0.2], [12.3, 3.8]].forEach(([x, z]) => { const r = mesh('stone', wx(0) + x, 0.12, wz(0) + z, 0.5, 0.28, 0.4); r.rotation.y = x; });
+    const t = new THREE.Group(); L.truckBody = mesh(new THREE.MeshLambertMaterial({ color: '#f26b21' }), 0, 0.55, 0, 1.3, 0.5, 0.7, t); mesh(new THREE.MeshLambertMaterial({ color: '#1a2a4f' }), 0.8, 0.55, 0, 0.45, 0.6, 0.7, t); mesh(new THREE.MeshBasicMaterial({ color: '#9be3ff' }), 1.03, 0.68, 0, 0.02, 0.22, 0.5, t);
+    [[-0.4, 0.38], [0.4, 0.38], [-0.4, -0.38], [0.4, -0.38], [0.8, 0.38], [0.8, -0.38]].forEach(([x, z]) => mesh(M.dark, x, 0.18, z, 0.3, 0.3, 0.1, t));
+    for (let i = 0; i < 6; i++) mesh(new THREE.MeshLambertMaterial({ color: i % 2 ? '#ffb02e' : '#ffd23f' }), -0.45 + (i % 3) * 0.3, 0.9, -0.15 + Math.floor(i / 3) * 0.3, 0.26, 0.22, 0.26, t);
+    L.loadTag = sprite('🥭', 0.5); L.loadTag.position.set(0, 1.35, 0); t.add(L.loadTag); world.add(t); L.truck = t;
+    this.showRound(L);
+  },
+  start(L) { if (getHints().length) show('#btnHint', true); },
+  showRound(L) {
+    const R = this.rounds[L.round]; L.R = R; L.deck = Array(R.gap).fill(null); L.pil = new Set(); L.ended = false; L.grp.clear(); L.objs = {};
+    for (let x = 2 + R.gap; x <= 11; x++) for (let z = 1; z <= 3; z++) { mesh(M.grass, wx(x), -0.5, wz(z), 1, 1, 1, L.grp); mesh('dirt', wx(x), -1.5, wz(z), 1, 1, 1, L.grp); }
+    R.block.forEach(b => { const f = mesh(new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.6 }), wx(2) - 0.5 + b, -0.36, wz(2), 0.6, 0.04, 3, L.grp); f.userData.foam = 1; const s2 = sprite('🌊', 0.7); s2.position.set(wx(2) - 0.5 + b, 0.5, wz(3) + 0.6); L.grp.add(s2); });
     const fl = sprite('🏁', 0.8); fl.position.set(wx(2 + R.gap) + 0.3, 1.2, wz(1)); L.grp.add(fl);
-    L.truck.position.set(wx(0.6), 0, wz(2)); L.truck.rotation.set(0, 0, 0); L.truck.visible = true; this.render(L);
-    say(L.round ? `Round ${L.round + 1}: the river is ${R.gap} m wide now 🌊` : this.intro, 0); },
-  render(L) { const R = L.R, sum = L.used.reduce((a, b) => a + b, 0);
-    panel(`<div class="bpanel"><b>🌉 Round ${L.round + 1}/${this.rounds.length}</b><span>River: <b>${R.gap} m</b></span><span>Bridge: <b id="s1sum">${sum} m</b></span><span id="bpTime">⏱️ ${Math.ceil(L.tLeft)}s</span></div><div class="planks">${Object.keys(R.planks).sort().map(n => `<button class="pk" data-n="${n}" ${L.left[n] ? '' : 'disabled'} style="width:${40 + n * 22}px">${n} m <small>×${L.left[n]}</small></button>`).join('')}<button class="pk undo2" data-u="1" ${L.used.length ? '' : 'disabled'}>↶</button><button class="pk go" data-g="1" ${L.used.length ? '' : 'disabled'}>🚚 Go!</button></div>`);
-    $('#panel').querySelectorAll('.pk').forEach(b => b.onclick = () => { if (L.ended || L.locked) return; if (b.dataset.n) this.add(L, +b.dataset.n); else if (b.dataset.u) { const n = L.used.pop(); if (n) { L.left[n]++; L.grp.remove(L.grp.children[L.grp.children.length - 1]); Sound.sfx('click'); } this.render(L); } else this.go(L); }); },
-  add(L, n) { const sum = L.used.reduce((a, b) => a + b, 0); if (!L.left[n]) return; if (sum + n > L.R.gap) { Sound.sfx('bump'); say(`A ${n} m plank is too long now! Only ${L.R.gap - sum} m is left 📏`, 2500); return; }
-    L.left[n]--; L.used.push(n); const p = mesh('plank', wx(2) - 0.5 + sum + n / 2, -0.05, wz(2), n - 0.06, 0.18, 1.4, L.grp); p.position.y = 1.5; tween(0.25, k => p.position.y = 1.5 - 1.55 * k, () => { burst(p.position, '#d8c7a0', 6, 1.5); Sound.sfx('place'); }); this.render(L); },
-  async go(L) { if (L.ended) return; L.ended = true; L.locked = true; const sum = L.used.reduce((a, b) => a + b, 0), ok = sum === L.R.gap; const t = L.truck, x0 = t.position.x;
-    Sound.sfx('push'); const xEnd = ok ? wx(12) : wx(2) - 0.5 + sum + 0.3; await new Promise(r => tween((xEnd - x0) * 0.12, k => t.position.x = x0 + (xEnd - x0) * k, r));
-    if (ok) { Sound.sfx('win'); confetti(50); L.wins++; await showBanner('🚚 Truck rescued! 🥭', 1300); }
-    else { Sound.sfx('splash'); await new Promise(r => tween(0.5, k => { t.position.y = -k * 1.2; t.rotation.z = -k * 0.6; }, r)); burst(t.position.clone().setY(0), '#7cc4ff', 20); failLevel(`Splash! 💦 The bridge was ${L.R.gap - sum} m too short.`); L.locked = false; L.ended = false; L.used = []; L.left = { ...L.R.planks }; this.showRound(L); return; }
-    L.results = (L.results || []).concat([{ gap: L.R.gap, planks: L.used.join('+') }]); L.round++; L.locked = false;
-    if (L.round >= this.rounds.length) { L.rec.extra = { bridges: L.results.map(r => `${r.gap}=${r.planks}`).join('; '), wins: L.wins }; panel(`<div class="pbig">🌉 All trucks rescued!</div>`); await sleep(500); completeLevel(); }
-    else this.showRound(L); },
-  update(L, dt, t) { M.water.map.offset.x += dt * 0.25; if (L.ended || L.locked || !L.R) return; L.tLeft -= dt; const e = $('#bpTime'); if (e) { e.textContent = `⏱️ ${Math.max(0, Math.ceil(L.tLeft))}s`; e.classList.toggle('low', L.tLeft < 15); }
-    if (L.tLeft <= 0) { L.ended = true; L.rec.fails++; L.rec.firstTry = false; L.results = (L.results || []).concat([{ gap: L.R.gap, planks: 'time' }]); say('Time! Promo helps build this one 🔥', 2000); L.round++; setTimeout(() => { if (L.round >= this.rounds.length) { L.rec.extra = { bridges: L.results.map(r => `${r.gap}=${r.planks}`).join('; '), wins: L.wins }; completeLevel(); } else this.showRound(L); }, 1200); } },
+    L.truck.position.set(wx(0.6), 0, wz(2)); L.truck.rotation.set(0, 0, 0); L.truck.visible = true;
+    const sc = R.load >= 2.5 ? 1.15 : R.load >= 2 ? 1 : 0.7; L.truck.scale.setScalar(sc);
+    this.draw(L); this.render(L);
+    say(L.round ? `Round ${L.round + 1}: ${R.gap} m river, ${R.who} weighs ${R.load} t${R.block.length ? '. Strong current in the middle 🌊' : ''}` : this.intro, 0);
+  },
+  cost(L) { return L.deck.reduce((a, m) => a + (m ? this.mats[m].cost : 0), 0) + L.pil.size * this.pillarCost; },
+  spans(L) { const sup = [0, ...[...L.pil].sort((a, b) => a - b), L.R.gap]; const out = []; for (let i = 0; i + 1 < sup.length; i++) out.push([sup[i], sup[i + 1]]); return out; },
+  // stress of each metre: max(load / strength, span length / max span) -> green < 0.75, yellow <= 1, red > 1 (breaks)
+  stress(L) { const st = Array(L.R.gap).fill(0); this.spans(L).forEach(([a, b]) => { for (let i = a; i < b; i++) { const m = L.deck[i]; if (!m) { st[i] = 9; continue; } const M2 = this.mats[m]; st[i] = Math.max(L.R.load / M2.t, (b - a) / M2.span); } }); return st; },
+  draw(L) {
+    Object.values(L.objs).forEach(o => L.grp.remove(o)); L.objs = {}; const G = L.R.gap;
+    for (let i = 0; i < G; i++) { const m = L.deck[i]; const x = wx(2) + i; let o;
+      if (m) { o = mesh(m === 'wood' ? 'plank' : new THREE.MeshLambertMaterial({ color: this.mats[m].col, emissive: '#000000' }), x, -0.02, wz(2), 0.98, m === 'rope' ? 0.08 : 0.16, 1.3, L.grp); if (m === 'steel') { mesh(M.dark, x, 0.25, wz(2) - 0.62, 1, 0.08, 0.06, L.grp); } if (m === 'rope') { [-0.62, 0.62].forEach(dz => { const r = mesh(new THREE.MeshLambertMaterial({ color: '#8a6a3a' }), x, 0.35, wz(2) + dz, 1, 0.04, 0.04, L.grp); }); } }
+      else o = mesh(new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.18, depthWrite: false }), x, -0.02, wz(2), 0.94, 0.1, 1.3, L.grp);
+      o.userData.deck = i; L.objs['d' + i] = o; }
+    for (let b = 1; b < G; b++) { const x = wx(2) - 0.5 + b; const on = L.pil.has(b); const o = on ? mesh('stone', x, -0.6, wz(2), 0.34, 1.1, 0.5, L.grp) : mesh(new THREE.MeshBasicMaterial({ color: L.R.block.includes(b) ? '#ff4040' : '#ffd23f', transparent: true, opacity: 0.35, depthWrite: false }), x, -0.3, wz(2) + 0.9, 0.22, 0.5, 0.22, L.grp); o.userData.pil = b; L.objs['p' + b] = o; }
+  },
+  render(L) {
+    const R = L.R, c = this.cost(L), over = c > R.budget;
+    const strip = Array.from({ length: R.gap }, (_, i) => `<button class="sc" data-i="${i}" style="background:${L.deck[i] ? this.mats[L.deck[i]].col : '#ffffff55'}">${L.deck[i] ? this.mats[L.deck[i]].e : ''}</button>${i < R.gap - 1 ? `<button class="sp ${L.pil.has(i + 1) ? 'on' : ''} ${R.block.includes(i + 1) ? 'blk' : ''}" data-p="${i + 1}" title="pillar">${R.block.includes(i + 1) ? '🌊' : '┃'}</button>` : ''}`).join('');
+    panel(`<div class="bpanel"><b>🌉 ${L.round + 1}/${this.rounds.length}</b><span>${R.who} <b>${R.load} t</b></span><span>River <b>${R.gap} m</b></span><span class="${over ? 'bad' : ''}">💰 ₹${c} / ₹${R.budget}</span></div>
+      <div class="smats">${Object.entries(this.mats).map(([k, m]) => `<button class="sm ${L.mat === k ? 'sel' : ''}" data-m="${k}"><span>${m.e} ${m.n}</span><small>holds ${m.t} t · span ${m.span} m · ₹${m.cost}/m</small></button>`).join('')}<button class="sm" data-fill="1"><span>⬛ Fill all</span><small>with ${this.mats[L.mat].n}</small></button></div>
+      <div class="sstrip"><span class="bank">⛰️</span>${strip}<span class="bank">⛰️</span></div><div class="small2">Tap a metre to lay ${this.mats[L.mat].n}. Tap ┃ to add a pillar (₹${this.pillarCost}).</div>
+      <div class="planks"><button class="pk undo2" data-clr="1">🧹 Clear</button><button class="pk go" data-g="1">🚚 Test drive!</button></div>`);
+    const P = $('#panel');
+    P.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { L.mat = b.dataset.m; Sound.sfx('click'); this.render(L); });
+    P.querySelector('[data-fill]').onclick = () => { if (L.ended) return; L.deck = L.deck.map(() => L.mat); Sound.sfx('place'); this.draw(L); this.render(L); };
+    P.querySelectorAll('[data-i]').forEach(b => b.onclick = () => this.setCell(L, +b.dataset.i));
+    P.querySelectorAll('[data-p]').forEach(b => b.onclick = () => this.togglePillar(L, +b.dataset.p));
+    P.querySelector('[data-clr]').onclick = () => { if (L.ended) return; L.deck = L.deck.map(() => null); L.pil.clear(); Sound.sfx('click'); this.draw(L); this.render(L); };
+    P.querySelector('[data-g]').onclick = () => this.go(L);
+  },
+  setCell(L, i, m) { if (L.ended || L.locked) return; m = m || L.mat; L.deck[i] = L.deck[i] === m ? null : m; Sound.sfx('place'); this.draw(L); const o = L.objs['d' + i]; if (o) { const y0 = o.position.y; o.position.y = 0.8; tween(0.2, k => o.position.y = 0.8 + (y0 - 0.8) * k); } this.render(L); },
+  togglePillar(L, b) { if (L.ended || L.locked) return; if (L.R.block.includes(b)) { Sound.sfx('bump'); say('The current is too strong there 🌊 Put the pillar somewhere else.', 2500); return; } if (L.pil.has(b)) L.pil.delete(b); else L.pil.add(b); Sound.sfx('push'); this.draw(L); this.render(L); },
+  onPointer(L, ray) { const hit = ray.intersectObjects(Object.values(L.objs || {}), false)[0]; if (!hit) return true; const u = hit.object.userData; if (u.deck !== undefined) this.setCell(L, u.deck); else if (u.pil) this.togglePillar(L, u.pil); return true; },
+  async go(L) {
+    if (L.ended || L.locked) return; const R = L.R;
+    if (L.deck.some(m => !m)) { Sound.sfx('bump'); say('Some metres have no bridge yet! Fill every gap first 🧱', 2500); return; }
+    const c = this.cost(L); if (c > R.budget) { Sound.sfx('bump'); say(`Over budget! ₹${c} is more than ₹${R.budget}. Try cheaper materials or fewer pillars 💰`, 3500); return; }
+    L.ended = true; L.locked = true; const st = this.stress(L); const sp = this.spans(L);
+    const brk = sp.find(([a, b]) => { for (let i = a; i < b; i++) if (st[i] > 1) return true; return false; });
+    const t = L.truck; const xs = wx(2) - 0.5; Sound.sfx('push');
+    await new Promise(r => tween(0.8, k => t.position.x = wx(0.6) + (xs - wx(0.6)) * k, r));
+    const xEnd = brk ? xs + (brk[0] + brk[1]) / 2 : wx(13.4); const dur = (xEnd - xs) * 0.32; let snapped = false;
+    await new Promise(r => tween(dur, k => {
+      t.position.x = xs + (xEnd - xs) * k; const tx = t.position.x - xs;
+      sp.forEach(([a, b]) => { const on = tx > a - 0.5 && tx < b + 0.5; for (let i = a; i < b; i++) { const o = L.objs['d' + i]; if (!o) continue; const f = Math.sin(Math.PI * (i + 0.5 - a) / (b - a)); const s2 = Math.min(1.4, st[i]); o.position.y = -0.02 - (on ? f * 0.28 * s2 : 0); if (o.material.emissive) o.material.emissive.set(on ? (s2 > 1 ? '#c01010' : s2 > 0.75 ? '#a08000' : '#108a30') : '#000000'); } });
+      t.position.y = Math.max(-0.35, ...[0]) * 0 - (sp.some(([a, b]) => tx > a && tx < b) ? 0.12 : 0);
+    }, r));
+    if (brk) {
+      snapped = true; Sound.sfx('crumble'); shake(0.3); const [a, b] = brk; for (let i = a; i < b; i++) { const o = L.objs['d' + i]; tween(0.6, k => { o.position.y = -0.02 - k * 1.4; o.rotation.z = (i - (a + b) / 2) * k * 0.4; }); }
+      await new Promise(r => tween(0.6, k => { t.position.y = -k * 1.3; t.rotation.z = -k * 0.7; }, r)); Sound.sfx('splash'); burst(t.position.clone().setY(0), '#7cc4ff', 24);
+      const mk = sprite('❌', 0.9); mk.position.set(xs + (a + b) / 2, 1.4, wz(2)); L.grp.add(mk);
+      const weak = (() => { for (let i = a; i < b; i++) { const M2 = this.mats[L.deck[i]]; if (R.load > M2.t) return `${M2.n} holds only ${M2.t} t, but the ${R.who.split(' ').slice(1).join(' ')} is ${R.load} t. Use something stronger!`; if (b - a > M2.span) return `That span is ${b - a} m, but ${M2.n} can only reach ${M2.span} m. Add a pillar ┃!`; } return 'That part was too weak.'; })();
+      failLevel(`Snap! 💥 ${weak}`); await sleep(1600); L.grp.remove(mk); t.rotation.set(0, 0, 0); t.position.set(wx(0.6), 0, wz(2)); L.ended = false; L.locked = false; this.draw(L); this.render(L); say(`💥 ${weak}`, 0); return;
+    }
+    const saved = R.budget - c; L.saved.push(saved / R.budget); L.wins++; Sound.sfx('win'); confetti(50);
+    await showBanner(`${R.who.split(' ')[0]} Rescued! 🥭 Saved ₹${saved}`, 1500);
+    L.results = (L.results || []).concat([{ gap: R.gap, cost: c, budget: R.budget, pillars: L.pil.size, mats: [...new Set(L.deck)].join('+') }]); L.round++; L.locked = false;
+    if (L.round >= this.rounds.length) {
+      const avg = L.saved.reduce((x, y) => x + y, 0) / L.saved.length; L.rec.costStars = avg >= 0.2 ? 3 : avg >= 0.08 ? 2 : 1;
+      L.rec.extra = { bridges: L.results.map(r => `${r.gap}m ₹${r.cost}/${r.budget} ${r.mats} ${r.pillars}p`).join('; '), savedPct: Math.round(avg * 100), costStars: L.rec.costStars };
+      panel(`<div class="pbig">🌉 All trucks rescued! You saved ${Math.round(avg * 100)}% of the budget.</div>`); await sleep(600); completeLevel();
+    } else this.showRound(L);
+  },
+  update(L, dt, t) { M.water.map.offset.x += dt * 0.35; if (L.grp) L.grp.children.forEach(o => { if (o.userData.foam) o.material.opacity = 0.4 + Math.sin(t / 150) * 0.25; }); }
 };
 
 const LEVELS = [
@@ -1202,6 +1293,11 @@ NEW.N1,
     { type: 'sort', ex: [['🍎', '#e53935'], ['🍌', '#fdd835'], ['🥦', '#43a047']], q: '🍋', ans: '#fdd835', opts: ['#e53935', '#43a047', '#fdd835', '#3b82f6'] },
     { type: 'num', seq: [1, 3, 5], ans: 7, opts: [6, 9, 7, 8] },
   ],
+  tracks: { '7-8': { rounds: [
+    { type: 'num', seq: [3, 6, 12], ans: 24, opts: [15, 18, 24, 20] },
+    { type: 'sort', ex: [['☀️', '#fdd835'], ['🌱', '#43a047'], ['💧', '#3b82f6']], q: '🌊', ans: '#3b82f6', opts: ['#e53935', '#43a047', '#fdd835', '#3b82f6'] },
+    { type: 'num', seq: [1, 4, 9], ans: 16, opts: [12, 16, 14, 25] }],
+    hints: L => [L.round === 1 ? 'Each example has a colour. Sun is yellow, plant is green, water is blue. Where does the sea go? 🌊' : L.round === 2 ? 'Try 1×1, 2×2, 3×3… what comes next? 🔢' : 'Look how each number grows. Is it adding, or doubling? ✖️', 'Gearbot finds the rule in the examples, then uses it. You can too!'] } },
   solid: c => c.t === 'G',
   setup(L) {
     L.round = 0; L.pads = []; L.disp = new THREE.Group(); world.add(L.disp);
@@ -1254,6 +1350,8 @@ NEW.N1,
   intro: 'Put the story in order! 📖 Walk onto (or tap) the picture that comes FIRST. It flies into slot 1.',
   goal: 'Fill the slots: 1 FIRST ➜ 2 NEXT ➜ 3 LAST',
   hints: ['What happens at the very START of this life?', 'Things start small and grow bigger 🌱', 'Made a mistake? Press ↶ Undo and try again.'],
+  tracks: { '7-8': { stories: [[['☀️', 'sun heats water'], ['☁️', 'clouds form'], ['🌧️', 'rain falls']], [['🧊', 'ice'], ['💧', 'water'], ['♨️', 'steam']], [['🌑', 'new moon'], ['🌓', 'half moon'], ['🌕', 'full moon']]],
+    hints: ['What has to happen FIRST for the next step to happen?', 'Heat changes things step by step ☀️', 'Made a mistake? Press ↶ Undo and try again.'] } },
   stories: [[['🥚', 'egg'], ['🐣', 'chick'], ['🐔', 'hen']], [['seed', 'seed'], ['🌱', 'sprout'], ['🌳', 'tree']], [['🐛', 'caterpillar'], ['cocoon', 'cocoon'], ['🦋', 'butterfly']]],
   solid: c => c.t === 'T',
   setup(L) {
@@ -1406,12 +1504,13 @@ NEW.S1,
 {
   id: 'L7', name: 'Pattern Builder', emoji: '🧱', skill: 'creativity', skillLabel: 'Pattern Copy (hard)',
   map: ['..........', '..........', '..........', '..........', '..........', '..........', '..........'],
-  intro: 'PATTERN BUILDER! 🧱 Copy the picture on the stand. Pick a colour, then tap a square.',
+  intro: 'PATTERN BUILDER! 🧱 Remember the picture: it hides after 5 seconds! Pick a colour, then tap a square.',
   goal: 'Make your grid look EXACTLY like the picture ⏱️', noWalk: true, noSkip: true, ownTimer: true,
-  hints: ['Start with the top row. Go left to right ➡️', 'Green ✅ = right colour. Tap a square again to change it.', 'Count the squares in the picture 🔢'],
+  hints: ['Look at the picture row by row and say the colours in your head 🧠', 'Green ✅ = right colour. Tap a square again to change it.', 'Peek 👀 costs 8 seconds. Use it when you are stuck.', 'Mirror round: left becomes right, like in a mirror 🪞'],
   cols: { R: ['#e53935', 'Red'], Y: ['#ffd23f', 'Yellow'], B: ['#3b82f6', 'Blue'], G: ['#2fa86b', 'Green'], O: ['#f26b21', 'Orange'], W: ['#f5f5f5', 'White'], P: ['#b46bff', 'Purple'] },
-  pats: [{ name: 'Mango Tile', time: 75, g: ['GYG', 'YOY', 'GYG'], decoy: 'B' }, { name: 'Rangoli', time: 90, g: ['RYR', 'YBY', 'RYR'], decoy: 'G' }],
-  tracks: { '7-8': { pats: [{ name: 'Kite', time: 90, g: ['BRRB', 'RYYR', 'RYYR', 'BRRB'], decoy: 'G' }, { name: 'Rangoli', time: 110, g: ['OGGO', 'GPPG', 'GPYG', 'OGGO'], decoy: 'B' }] } },
+  peekCost: 8, showSec: 5,
+  pats: [{ name: 'Mango Tile', time: 45, g: ['GYG', 'YOG', 'GGY'], decoy: 'BR' }, { name: 'Kite', time: 60, g: ['BRRB', 'RYYR', 'RYOR', 'BRRB'], decoy: 'GW' }, { name: 'Mirror Flag', time: 70, mirror: true, g: ['ORRY', 'OBRY', 'OBBY', 'GGGY'], decoy: 'PW' }],
+  tracks: { '7-8': { pats: [{ name: 'Kite', time: 55, g: ['BRRB', 'RYYR', 'RYOR', 'BRRB'], decoy: 'GWP' }, { name: 'Rangoli', time: 75, g: ['OGPGO', 'GPYPG', 'PYRYP', 'GPYPG', 'OGPGO'], decoy: 'WB' }, { name: 'Mirror Fort', time: 90, mirror: true, g: ['RRYBB', 'ROYGB', 'OOYGG', 'ROYGB', 'RRYBB'], decoy: 'WP' }] } },
   setup(L) {
     L.round = -1; L.results = []; L.mat = null; L.grp = new THREE.Group(); world.add(L.grp);
     mesh('stone', wx(7.5), 0.4, wz(3), 2.6, 0.8, 0.6); L.stand = new THREE.Group(); L.stand.position.set(wx(7.5), 2.3, wz(3)); world.add(L.stand);
@@ -1426,14 +1525,17 @@ NEW.S1,
     const sz = 2.4 / n; const back = new THREE.Mesh(BOX, new THREE.MeshLambertMaterial({ color: '#1a2a4f' })); back.scale.set(2.7, 2.7, 0.15); back.position.z = -0.1; L.stand.add(back);
     P.g.forEach((row, z) => row.split('').forEach((k, x) => { const b = new THREE.Mesh(BOX, new THREE.MeshLambertMaterial({ color: this.cols[k][0] })); b.scale.set(sz * 0.92, sz * 0.92, 0.2); b.position.set((x - (n - 1) / 2) * sz, ((n - 1) / 2 - z) * sz, 0.05); L.stand.add(b); }));
     L.stand.rotation.x = -0.5; L.stand.scale.setScalar(0.01); tween(0.4, k => L.stand.scale.setScalar(k));
-    for (let z = 0; z < n; z++) for (let x = 0; x < n; x++) { const tile = mesh(new THREE.MeshLambertMaterial({ color: (x + z) % 2 ? '#d9b77e' : '#c9a36a' }), wx(x0 + x), 0.05, wz(z0 + z), 0.94, 0.1, 0.94, L.grp); tile.userData.pc = { x, z }; L.cells.push({ x, z, tile, want: P.g[z][x], have: null, blk: null }); }
+    for (let z = 0; z < n; z++) for (let x = 0; x < n; x++) { const tile = mesh(new THREE.MeshLambertMaterial({ color: (x + z) % 2 ? '#d9b77e' : '#c9a36a' }), wx(x0 + x), 0.05, wz(z0 + z), 0.94, 0.1, 0.94, L.grp); tile.userData.pc = { x, z }; L.cells.push({ x, z, tile, want: P.mirror ? P.g[z][n - 1 - x] : P.g[z][x], have: null, blk: null }); }
     const fm = new THREE.MeshBasicMaterial({ color: '#f26b21' }); const cx = wx(3), cz = wz(3), h = n / 2 + 0.05;
     [[cx, cz - h, n + 0.2, 0.1], [cx, cz + h, n + 0.2, 0.1], [cx - h, cz, 0.1, n + 0.2], [cx + h, cz, 0.1, n + 0.2]].forEach(([x, z, sx, sz2]) => mesh(fm, x, 0.12, z, sx, 0.06, sz2, L.grp));
-    const need = [...new Set(P.g.join(''))]; const pal = shuffle([...need, P.decoy]); L.mat = pal[0];
+    const need = [...new Set(P.g.join(''))]; const dec = (P.decoy || '').split('').filter(k => !need.includes(k)); for (const k of shuffle(Object.keys(this.cols))) if (dec.length < 2 && !need.includes(k) && !dec.includes(k)) dec.push(k); const pal = shuffle([...need, ...dec]); L.mat = pal[0];
+    L.cover = new THREE.Group(); const cv = new THREE.Mesh(BOX, new THREE.MeshLambertMaterial({ color: '#1a2a4f' })); cv.scale.set(2.8, 2.8, 0.3); cv.position.z = 0.15; L.cover.add(cv); const q = sprite('❓', 1.4); q.position.z = 0.4; L.cover.add(q); L.cover.visible = false; L.stand.add(L.cover);
+    L.showT = this.showSec; L.peeks = 0;
     const bar = $('#buildBar'); bar.innerHTML = pal.map(k => `<button data-c="${k}" class="pal ${k === L.mat ? 'sel' : ''}" style="background:${this.cols[k][0]}"><span>&nbsp;</span><small>${this.cols[k][1]}</small></button>`).join('') + `<button class="txt done" data-x="done">✅ Done</button>`;
     bar.querySelectorAll('button').forEach(b => b.onclick = () => { Sound.sfx('click'); if (b.dataset.c) { L.mat = b.dataset.c; bar.querySelectorAll('button').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); } else if (!L.ended) this.endRound(L, 'done'); });
-    panel(`<div class="bpanel"><b>Round ${L.round + 1}/${this.pats.length}: ${P.name}</b><span id="bpTime">⏱️ ${P.time}s</span><span id="bpMatch">✅ 0 / ${n * n}</span></div><div class="mbar"><i id="bpBar"></i></div>`);
-    say(L.round ? `Last one: ${P.name}! 🎨 A bit harder.` : this.intro, 0);
+    panel(`<div class="bpanel"><b>Round ${L.round + 1}/${this.pats.length}: ${P.name}</b><span id="bpTime">⏱️ ${P.time}s</span><span id="bpMatch">✅ 0 / ${n * n}</span><button class="pk" id="bpPeek">👀 Peek (−${this.peekCost}s)</button></div><div class="mbar"><i id="bpBar"></i></div>${P.mirror ? '<div class="pbig">🪞 MIRROR ROUND: build the mirror image (flip left ↔ right)!</div>' : ''}`);
+    $('#bpPeek').onclick = () => this.peek(L);
+    say(P.mirror ? `Last one: ${P.name}! 🪞 Build it flipped, like in a mirror. Remember it: it hides in ${this.showSec} seconds!` : L.round ? `${P.name}: bigger and trickier! 🧠 Remember it fast.` : this.intro, 0);
   },
   set(L, x, z, k) {
     if (L.ended || L.locked) return; const c = L.cells.find(q => q.x === x && q.z === z); if (!c) return; k = k || L.mat;
@@ -1444,11 +1546,12 @@ NEW.S1,
     else { Sound.sfx('place'); say('Hmm, look at the picture again for that square 👀', 1800); }
     this.live(L);
   },
+  peek(L) { if (L.ended || L.locked || L.showT > 0) return; L.peeks++; L.tLeft -= this.peekCost; L.showT = 2; L.cover.visible = false; Sound.sfx('click'); L.rec.extra.peeks = (L.rec.extra.peeks || 0) + 1; },
   count(L) { return L.cells.filter(c => c.have === c.want).length; },
   live(L) { const ok = this.count(L), n2 = L.n * L.n; const e = $('#bpMatch'); if (e) e.textContent = `✅ ${ok} / ${n2}`; const b = $('#bpBar'); if (b) b.style.width = (100 * ok / n2) + '%'; if (ok === n2 && L.cells.every(c => c.have === c.want)) this.endRound(L, 'perfect'); },
   async endRound(L, why) {
     if (L.ended) return; L.ended = true; const ok = this.count(L), pct = Math.round(100 * ok / (L.n * L.n)), sec = Math.round(now() - L.rt0);
-    L.results.push({ name: L.P.name, acc: pct, sec, limit: L.P.time }); if (pct < 100) { L.rec.fails++; L.rec.firstTry = false; }
+    L.results.push({ name: L.P.name, acc: pct, sec, limit: L.P.time, peeks: L.peeks }); if (L.cover) L.cover.visible = false; if (pct < 100) { L.rec.fails++; L.rec.firstTry = false; }
     if (pct === 100) { Sound.sfx('win'); confetti(80); L.cells.forEach((c, i) => { if (c.blk) { const b = c.blk; tween(0.9, k => b.position.y = 0.4 + Math.abs(Math.sin(k * Math.PI * 2 + i * 0.4)) * 0.6); } }); tween(0.9, k => L.stand.rotation.y = k * Math.PI * 2); }
     else Sound.sfx('good');
     await showBanner(pct === 100 ? `🎉 Perfect ${L.P.name}!` : why === 'time' ? `⏰ Time! ${pct}% right` : `${pct}% right! 👍`, 1600);
@@ -1466,6 +1569,7 @@ NEW.S1,
   update(L, dt, t) {
     if (L.stand && !L.ended) L.stand.position.y = 2.3 + Math.sin(t / 500) * 0.05;
     if (L.ended || L.finishing || L.locked || !L.P) return;
+    if (L.showT > 0) { L.showT -= dt; if (L.showT <= 0 && L.cover) { L.cover.visible = true; Sound.sfx('click'); } } const pk = $('#bpPeek'); if (pk) pk.disabled = L.showT > 0;
     L.tLeft -= dt; const el = $('#bpTime'); if (el) { el.textContent = `⏱️ ${Math.max(0, Math.ceil(L.tLeft))}s`; el.classList.toggle('low', L.tLeft < 15); }
     if (L.tLeft <= 0) this.endRound(L, 'time');
   }
@@ -1549,7 +1653,7 @@ NEW.S1,
     camTarget.set(0, 4, -26); camDist = 16; torchFire.visible = true; tween(1.2, k => { torchLight.intensity = 6 * k; torchFire.scale.setScalar(k); });
     Sound.sfx('win'); setTimeout(() => Sound.sfx('cheer'), 600);
     for (let i = 0; i < 5; i++) setTimeout(() => burst(new THREE.Vector3(rnd(-4, 4), rnd(6, 10), -30), pick(['#f26b21', '#ffd23f', '#ff4f8b', '#4fc3ff']), 24, 4), 300 + i * 350);
-    await showBanner('🔥 The Great Torch is lit! 🔥', 2600);
+    await showBanner('🔥 The fire is back! 🔥', 2000);
     const hows = [['👀', 'I watched the red tiles'], ['🏃', 'I kept moving'], ['🔥', 'I grabbed embers fast'], ['🤔', 'I made a plan']];
     const res = await modal(`<h2>You saved Promethia! 🏆</h2><p class="story-text">How did you beat the golem?</p><div class="choices">${hows.map(([e, t]) => `<button class="choice" data-t="${t}"><span class="em">${e}</span>${t}</button>`).join('')}</div><input type="text" id="hLine" maxlength="140" placeholder="Tell a friend in one line (optional)"><button class="btn primary" id="hGo" disabled>See my badge 🏅</button>`, (el, done) => {
       let how = null; el.querySelectorAll('.choice').forEach(b => b.onclick = () => { how = b.dataset.t; el.querySelectorAll('.choice').forEach(q => q.classList.remove('sel')); b.classList.add('sel'); el.querySelector('#hGo').disabled = false; Sound.sfx('click'); });
@@ -1596,7 +1700,7 @@ function computeScores() {
   return { sc, firstTry, puzzles: PUZZLES.length };
 }
 function titleFor(total) { return total >= 80 ? 'Legendary Torchbearer' : total >= 65 ? 'Torchbearer' : total >= 50 ? 'Flame Keeper' : 'Brave Spark'; }
-function islandStars(l) { if (!l || !l.completed) return 0; let s2 = 3; if (l.fails >= 1 || l.hints >= 1) s2--; if (l.fails >= 3 || l.hints >= 2) s2--; return Math.max(1, s2); }
+function islandStars(l) { if (!l || !l.completed) return 0; if (l.costStars) return Math.max(1, Math.min(l.costStars, 3 - (l.fails >= 3 ? 1 : 0))); let s2 = 3; if (l.fails >= 1 || l.hints >= 1) s2--; if (l.fails >= 3 || l.hints >= 2) s2--; return Math.max(1, s2); }
 function badgePool(totalSec) {
   const lv = S.levels.filter(Boolean); const by = Object.fromEntries(lv.map(l => [l.id, l])); const b = S.build || {};
   const hints = lv.reduce((a, l) => a + l.hints, 0); const explore = lv.reduce((a, l) => a + l.explore, 0);
@@ -1662,13 +1766,38 @@ async function retryUnsent() {
 window.PQ_submitRecord = submitRecord;
 
 /* ================= FINISH ================= */
+// Grand finale: fly to a giant torch on the last island, ignite it, light up every island
+async function grandFinale() {
+  await fade(true); ['#hud', '#actions', '#dpad', '#promo', '#buildBar', '#panel', '#mapUI'].forEach(s2 => show(s2, false));
+  buildOverworld(); setMode('map'); mapCam(); player.g.visible = false;
+  const last = ISL.length - 1, P = ISL[last].pos.clone(); ISL.forEach((s2, i) => { s2.flame.visible = i < last; s2.lock.visible = false; setSign(i, 'done'); setBridge(i, true); });
+  const g = new THREE.Group(); g.position.copy(P).add(new THREE.Vector3(0, 0, -0.6)); overworld.add(g);
+  mesh('stone', 0, 0.4, 0, 1.6, 0.8, 1.6, g); mesh('log', 0, 2.4, 0, 0.6, 3.4, 0.6, g); mesh(M.gold, 0, 4.2, 0, 1.8, 0.5, 1.8, g);
+  const fire = new THREE.Group(); fire.position.y = 4.5; g.add(fire); fire.scale.setScalar(0.01);
+  [['#ff4f1a', 1.5, 0.9], ['#ff8a1a', 1.1, 1.6], ['#ffd23f', 0.7, 2.2], ['#fff3b0', 0.35, 2.6]].forEach(([c, w, h]) => { const f = new THREE.Mesh(BOX, new THREE.MeshBasicMaterial({ color: c })); f.scale.set(w, h, w); f.position.y = h / 2; f.rotation.y = w; fire.add(f); });
+  const light = new THREE.PointLight('#ffb35a', 0, 80); light.position.set(0, 7, 0); g.add(light);
+  MC.follow = false; MC.target.copy(P).add(new THREE.Vector3(0, 3, 0)); const d0 = MC.dist; MC.dist = camera.aspect < 0.8 ? 18 : 13;
+  camera.position.copy(P).add(new THREE.Vector3(0, 40, 30));
+  const ov = document.createElement('div'); ov.id = 'finale'; ov.innerHTML = '<div class="fin-t">THE GREAT TORCH IS LIT! 🔥</div><div class="fin-s">You brought the light back to every island of Promethia ✨</div><div class="fin-tap">tap to continue</div>'; document.body.appendChild(ov);
+  let skip; const skipP = new Promise(r => skip = r); ov.onclick = () => skip();
+  const wait = ms => Promise.race([sleep(ms), skipP]);
+  await fade(false); await wait(1500);
+  Sound.sfx('fire'); shake(0.4); fire.scale.setScalar(0.01); tween(0.7, k => { fire.scale.setScalar(0.01 + k * 1.2); light.intensity = 8 * k; });
+  for (let i = 0; i < 6; i++) setTimeout(() => burst(g.position.clone().add(new THREE.Vector3(rnd(-1, 1), 6 + rnd(0, 2), rnd(-1, 1))), pick(['#f26b21', '#ffd23f', '#ff4f1a', '#fff3b0']), 30, 5), i * 220);
+  if (!(scene.background && scene.background.isColor)) scene.background = new THREE.Color('#7ec8ff'); const sky0 = scene.background.clone(), sky1 = new THREE.Color('#ffcf8a'); tween(1.5, k => { scene.background.copy(sky0).lerp(sky1, k); if (scene.fog) scene.fog.color.copy(scene.background); });
+  ISL.forEach((s2, i) => setTimeout(() => { s2.flame.visible = true; burst(s2.flame.getWorldPosition(new THREE.Vector3()), '#ffd23f', 14, 2); }, 300 + i * 90));
+  setTimeout(() => { MC.dist = camera.aspect < 0.8 ? 46 : 36; MC.target.set(0, 0, camera.aspect < 0.8 ? 4 : 0); }, 900);
+  ov.classList.add('show'); Sound.sfx('win'); setTimeout(() => Sound.sfx('star'), 700); confetti(120); setTimeout(() => confetti(80), 1500);
+  window.__pqFinale = true; await wait(4600); ov.classList.add('out'); await sleep(400); ov.remove(); MC.dist = d0; MC.follow = true; fire.scale.setScalar(1.2);
+}
 async function finishGame() {
   L.locked = true; ['#hud', '#actions', '#dpad', '#promo', '#buildBar'].forEach(s => show(s, false));
+  const endT = Date.now(); try { await grandFinale(); } catch (e) { console.warn(e); document.getElementById('finale')?.remove(); }
   const { sc, firstTry, puzzles } = computeScores(); const title = titleFor(sc.total);
   const rec = {
     id: 'PQ-' + Date.now().toString(36).toUpperCase(), test: TEST, name: S.student.name, school: S.student.school, band: S.band, grade: S.student.grade, section: S.student.section, pc: S.student.pc, hero: S.hero.name,
-    startedAt: S.startedAt, finishedAt: new Date().toISOString(), totalSec: Math.round((Date.now() - new Date(S.startedAt).getTime()) / 1000),
-    levels: S.levels.map(l => l && ({ id: l.id, name: l.name, skill: l.skill, time: l.time, attempts: l.attempts, fails: l.fails, hints: l.hints, stars: l.stars, explore: l.explore, embers: l.embers, completed: l.completed, skipped: l.skipped, firstTry: l.firstTry })),
+    startedAt: S.startedAt, finishedAt: new Date(endT).toISOString(), totalSec: Math.round((endT - new Date(S.startedAt).getTime()) / 1000),
+    levels: S.levels.map(l => l && ({ costStars: l.costStars, id: l.id, name: l.name, skill: l.skill, time: l.time, attempts: l.attempts, fails: l.fails, hints: l.hints, stars: l.stars, explore: l.explore, embers: l.embers, completed: l.completed, skipped: l.skipped, firstTry: l.firstTry })),
     build: S.build, speech: S.speech, boss: S.boss, voice: S.voice, tale: S.tale, invent: S.invent, stars: S.stars, embers: S.embers, scores: sc, firstTry, puzzles, title, sent: false,
   };
   const top = topBadges(rec.totalSec); rec.badges = top.map(x => `${x.e} ${x.n}`); rec.badgeIds = top.map(x => x.id); rec.islandStars = LEVELS.map((d, i) => islandStars(S.levels[i]));
