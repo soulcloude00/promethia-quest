@@ -588,6 +588,8 @@ function bandFor(grade) { return (+grade >= 7) ? '7-8' : '5-6'; }
 function trackDef(base) { const o = base.tracks && base.tracks[S.band]; return o ? Object.assign(Object.create(base), o) : base; }
 function newRec(def) { return { id: def.id, name: def.name, skill: def.skill, t0: now(), time: 0, attempts: 1, fails: 0, hints: 0, stars: 0, explore: 0, embers: 0, steps: 0, completed: false, skipped: false, firstTry: true, extra: {} }; }
 /* resume-on-refresh: the unfinished run is kept in localStorage; only active play time counts */
+function updateTotalTime() { const tt = $('#totalTime'); if (!tt || !S.startedAt || S.finishing) return; const sec = elapsedSec(); tt.textContent = `⏱️ ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
+setInterval(updateTotalTime, 1000);
 function elapsedSec() { return S.startedAt ? Math.max(0, Math.round((Date.now() - new Date(S.startedAt).getTime()) / 1000)) : 0; }
 function saveRun() { if (!S.student || S.finishing || TEST && QS.get('noresume')) return; try { localStorage.setItem(RUN_KEY, JSON.stringify({ v: 1, S, elapsed: elapsedSec(), savedAt: Date.now() })); } catch (e) { } }
 function loadRun() { try { const r = JSON.parse(localStorage.getItem(RUN_KEY) || 'null'); return r && r.v === 1 && r.S && r.S.student && r.S.idx < LEVELS.length ? r : null; } catch (e) { return null; } }
@@ -598,7 +600,7 @@ function showStartOrResume() {
   $('#resumeName').textContent = nm; $('#resumeInfo').textContent = `Island ${r.S.idx + 1} of ${LEVELS.length} · ${n} island${n === 1 ? '' : 's'} done · ⏱️ ${Math.floor(r.elapsed / 60)}:${String(r.elapsed % 60).padStart(2, '0')}`;
   show('#resume');
   $('#resumeGo').onclick = async () => { Sound.init(); show('#resume', false); Object.assign(S, r.S); S.hero = r.S.hero || AVATARS[S.avatar] || AVATARS.boy; buildPlayer(S.hero);
-    S.startedAt = new Date(Date.now() - r.elapsed * 1000).toISOString(); hud();
+    S.startedAt = new Date(Date.now() - r.elapsed * 1000).toISOString(); hud(); updateTotalTime();
     if (!(DEBUG && QS.get('nomap'))) await showMap(-1, S.idx); startLevel(S.idx); };
   $('#resumeNew').onclick = () => { if (!confirm(`Start a NEW quest? ${nm}'s progress will be lost.`)) return; clearRun(); show('#resume', false); show('#start'); };
 }
@@ -657,7 +659,7 @@ function checkHelpers() {
   if ((!L.def.noSkip || (!tut && !L.def.ownTimer)) && ((!L.def.skipFails && t > (CFG.SKIP_AFTER_SEC || (hard ? 120 : 75))) || f >= (CFG.SKIP_AFTER_FAILS || 3))) show('#btnSkip', true);
   // time budget: after a long time, Promo offers to move on (once per level)
   if (!tut && !L.def.ownTimer && !L.def.skipFails && !L.offered && !L.locked && !(TEST && !QS.get('offer')) && t > (hard ? 180 : 120)) { L.offered = true; L.rec.extra.offeredSkip = 1; skipLevel(true); }
-  const tt = $('#totalTime'); if (tt && S.startedAt) { const sec = Math.round((Date.now() - new Date(S.startedAt).getTime()) / 1000); tt.textContent = `⏱️ ${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`; }
+  updateTotalTime();
 }
 
 /* ================= INPUT ================= */
