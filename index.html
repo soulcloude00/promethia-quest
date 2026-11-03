@@ -6,7 +6,7 @@
 <title>Promethia Quest: Relight the Great Torch</title>
 <meta name="robots" content="noindex">
 <link rel="icon" href="assets/favicon-32.png">
-<link rel="stylesheet" href="style.css?v=v5a">
+<link rel="stylesheet" href="style.css?v=v6a">
 </head>
 <body>
 <canvas id="c"></canvas>
@@ -65,6 +65,15 @@
 <div id="mapUI" class="hidden"><div class="map-card"><div id="mapTitle"></div><div id="mapSub" class="small"></div><div id="mapDots"></div><button id="mapGo" class="btn primary">Play ▶</button></div></div>
 
 <!-- Start screen -->
+<div id="resume" class="screen hidden">
+  <div class="card" style="text-align:center">
+    <img src="assets/promo.webp" class="promo-big" alt="Promo">
+    <h1>Welcome back, <span id="resumeName"></span>!</h1>
+    <p class="tag" id="resumeInfo"></p>
+    <button id="resumeGo" class="btn primary" style="font-size:1.6em;padding:16px 48px;margin:14px auto;display:block">▶ Continue your quest</button>
+    <button id="resumeNew" style="background:none;border:none;color:#9ab;text-decoration:underline;cursor:pointer;font-size:.9em">Not you? Start new</button>
+  </div>
+</div>
 <div id="start" class="screen hidden">
   <div class="card">
     <img src="assets/promo.webp" class="promo-big" alt="Promo">
@@ -127,6 +136,6 @@
 
 <div id="fade"></div>
 <script src="config.js"></script>
-<script type="module" src="game.js?v=v5a"></script>
+<script type="module" src="game.js?v=v6a"></script>
 </body>
 </html>

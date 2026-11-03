@@ -6,7 +6,7 @@ const QS = new URLSearchParams(location.search);
 const TEST = QS.get('test') === '1';
 const DEBUG = TEST || QS.get('debug') === '1';
 const $ = s => document.querySelector(s);
-const ARCHIVE_KEY = 'pq_archive', QUALITY_KEY = 'pq_quality', SOUND_KEY = 'pq_sound';
+const RUN_KEY = 'pq_run', ARCHIVE_KEY = 'pq_archive', QUALITY_KEY = 'pq_quality', SOUND_KEY = 'pq_sound';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const now = () => performance.now() / 1000;
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -587,8 +587,23 @@ function bandFor(grade) { return (+grade >= 7) ? '7-8' : '5-6'; }
 // Per-track content: a level may define tracks: { '5-6': {...}, '7-8': {...} }; overrides are layered over the base level.
 function trackDef(base) { const o = base.tracks && base.tracks[S.band]; return o ? Object.assign(Object.create(base), o) : base; }
 function newRec(def) { return { id: def.id, name: def.name, skill: def.skill, t0: now(), time: 0, attempts: 1, fails: 0, hints: 0, stars: 0, explore: 0, embers: 0, steps: 0, completed: false, skipped: false, firstTry: true, extra: {} }; }
+/* resume-on-refresh: the unfinished run is kept in localStorage; only active play time counts */
+function elapsedSec() { return S.startedAt ? Math.max(0, Math.round((Date.now() - new Date(S.startedAt).getTime()) / 1000)) : 0; }
+function saveRun() { if (!S.student || S.finishing || TEST && QS.get('noresume')) return; try { localStorage.setItem(RUN_KEY, JSON.stringify({ v: 1, S, elapsed: elapsedSec(), savedAt: Date.now() })); } catch (e) { } }
+function loadRun() { try { const r = JSON.parse(localStorage.getItem(RUN_KEY) || 'null'); return r && r.v === 1 && r.S && r.S.student && r.S.idx < LEVELS.length ? r : null; } catch (e) { return null; } }
+function clearRun() { try { localStorage.removeItem(RUN_KEY); } catch (e) { } }
+function showStartOrResume() {
+  const r = loadRun(); if (!r) return show('#start');
+  const n = (r.S.levels || []).filter(Boolean).length, nm = String(r.S.student.name).replace(/[<>&"]/g, '');
+  $('#resumeName').textContent = nm; $('#resumeInfo').textContent = `Island ${r.S.idx + 1} of ${LEVELS.length} · ${n} island${n === 1 ? '' : 's'} done · ⏱️ ${Math.floor(r.elapsed / 60)}:${String(r.elapsed % 60).padStart(2, '0')}`;
+  show('#resume');
+  $('#resumeGo').onclick = async () => { Sound.init(); show('#resume', false); Object.assign(S, r.S); S.hero = r.S.hero || AVATARS[S.avatar] || AVATARS.boy; buildPlayer(S.hero);
+    S.startedAt = new Date(Date.now() - r.elapsed * 1000).toISOString(); hud();
+    if (!(DEBUG && QS.get('nomap'))) await showMap(-1, S.idx); startLevel(S.idx); };
+  $('#resumeNew').onclick = () => { if (!confirm(`Start a NEW quest? ${nm}'s progress will be lost.`)) return; clearRun(); show('#resume', false); show('#start'); };
+}
 async function startLevel(i) {
-  S.idx = i; const def = trackDef(LEVELS[i]); document.body.dataset.level = def.id;
+  S.idx = i; saveRun(); const def = trackDef(LEVELS[i]); document.body.dataset.level = def.id;
   await fade(true); show('#mapUI', false);
   ['#btnHint', '#btnSkip', '#btnReset', '#btnAct', '#buildBar', '#hearts', '#panel'].forEach(s => show(s, false)); $('#btnAct').onclick = null;
   setMode('level'); player.g.position.y = 0;
@@ -622,7 +637,7 @@ async function completeLevel() {
   if (!L || L.done) return; L.done = true; L.locked = true; L.rec.completed = !L.rec.skipped; L.rec.time = Math.round(now() - L.rec.t0);
   if (L.rec.hints) L.rec.firstTry = false;
   if (L.def.cleanup) L.def.cleanup(L);
-  S.levels[S.idx] = L.rec;
+  S.levels[S.idx] = L.rec; if (S.idx + 1 < LEVELS.length) { S.idx++; saveRun(); S.idx--; }
   if (!L.rec.skipped) { Sound.sfx('win'); confetti(70); player.jumpT = 0.5; await showBanner(pick(['Level clear! 🎉', 'Awesome! 🔥', 'You did it! ⭐', 'Brilliant! 🏆']), 1500); }
   if (S.idx + 1 < LEVELS.length) { const n = S.idx + 1; if (!(DEBUG && QS.get('nomap'))) await showMap(S.idx, n); startLevel(n); } else finishGame();
 }
@@ -636,7 +651,7 @@ async function skipLevel(offer) {
   if (ok) { L.rec.skipped = true; completeLevel(); }
 }
 function checkHelpers() {
-  if (!L || L.done) return; const t = now() - L.rec.t0, f = L.rec.fails;
+  if (!L || L.done) return; const t = now() - L.rec.t0, f = L.rec.fails; if (!S.lastSave || Date.now() - S.lastSave > 10000) { S.lastSave = Date.now(); saveRun(); }
   if (getHints().length && (t > (CFG.HINT_AFTER_SEC || 45) || f >= (CFG.HINT_AFTER_FAILS || 2))) show('#btnHint', true);
   const hard = S.idx >= LEVELS.length - 3, tut = S.idx === 0;
   if ((!L.def.noSkip || (!tut && !L.def.ownTimer)) && ((!L.def.skipFails && t > (CFG.SKIP_AFTER_SEC || (hard ? 120 : 75))) || f >= (CFG.SKIP_AFTER_FAILS || 3))) show('#btnSkip', true);
@@ -1872,7 +1887,7 @@ async function submitRecord(rec) {
 }
 async function retryUnsent() {
   if (TEST) return; const a = getArchive(); let changed = false;
-  for (const r of a) if (!r.sent && !r.test) { try { await submitRecord(r); r.sent = true; r.sentAt = new Date().toISOString(); changed = true; } catch (e) { break; } }
+  for (const r of a) if (!r.sent && !r.test && !(r.tryAt && Date.now() - r.tryAt < 120000)) { try { await submitRecord(r); r.sent = true; r.sentAt = new Date().toISOString(); changed = true; } catch (e) { break; } }
   if (changed) setArchive(a);
 }
 window.PQ_submitRecord = submitRecord;
@@ -1906,7 +1921,7 @@ async function grandFinale() {
 }
 async function finishGame() {
   L.locked = true; ['#hud', '#actions', '#dpad', '#promo', '#buildBar'].forEach(s => show(s, false));
-  const endT = Date.now(); try { await grandFinale(); } catch (e) { console.warn(e); document.getElementById('finale')?.remove(); }
+  const endT = Date.now(); S.finishing = true; clearRun(); try { await grandFinale(); } catch (e) { console.warn(e); document.getElementById('finale')?.remove(); }
   const { sc, firstTry, puzzles } = computeScores(); const title = titleFor(sc.total);
   const rec = {
     id: 'PQ-' + Date.now().toString(36).toUpperCase(), test: TEST, name: S.student.name, school: S.student.school, band: S.band, grade: S.student.grade, section: S.student.section, pc: S.student.pc, avatar: S.avatar, hero: S.hero.name,
@@ -1927,7 +1942,7 @@ async function finishGame() {
   $('#resIslands').innerHTML = LEVELS.map((d, i) => `<div class="isl1" title="${d.name}"><span>${d.emoji}</span><small>${i + 1}</small><b>${'★'.repeat(rec.islandStars[i])}<em>${'★'.repeat(3 - rec.islandStars[i])}</em></b></div>`).join('');
   show('#results'); Sound.sfx('win');
   $('#saveStatus').className = 'save'; $('#saveStatus').textContent = 'Saving… ⏳';
-  let ok = false;
+  let ok = false; { const a1 = getArchive(); const m1 = a1.find(r => r.id === rec.id); if (m1) { m1.tryAt = Date.now(); setArchive(a1); } }
   for (let i = 0; i < 2 && !ok; i++) { try { await submitRecord(rec); ok = true; } catch (e) { console.warn('submit failed', e.message); await sleep(1500); } }
   const a2 = getArchive(); const me = a2.find(r => r.id === rec.id); if (me) { me.sent = ok; if (ok) me.sentAt = new Date().toISOString(); setArchive(a2); }
   $('#saveStatus').className = 'save ok'; $('#saveStatus').textContent = ok ? 'Saved ✓' : 'Saved on this PC ✓ (email will retry later)';
@@ -1986,7 +2001,7 @@ applyQuality(); requestAnimationFrame(loop);
     g.globalAlpha = 1; };
   requestAnimationFrame(tick);
   SC.pos.set(0, 2, 60); tween(4.5, k => SC.pos.z = 60 - 24 * (1 - Math.pow(1 - k, 3)));
-  const end = () => { if (!alive) return; alive = false; const l0 = SC.look.clone(), port = camera.aspect < 0.8; tween(1.2, k => SC.look.lerpVectors(l0, port ? new THREE.Vector3(0, 13, 0) : new THREE.Vector3(15, 0, 0), ease(k))); $('#intro').classList.add('out'); setTimeout(() => { show('#intro', false); }, 700); show('#start'); };
+  const end = () => { if (!alive) return; alive = false; const l0 = SC.look.clone(), port = camera.aspect < 0.8; tween(1.2, k => SC.look.lerpVectors(l0, port ? new THREE.Vector3(0, 13, 0) : new THREE.Vector3(15, 0, 0), ease(k))); $('#intro').classList.add('out'); setTimeout(() => { show('#intro', false); }, 700); showStartOrResume(); };
   $('#introSkip').onclick = () => { Sound.init(); end(); }; setTimeout(end, TEST ? 1800 : 5200);
 })();
 retryUnsent();
