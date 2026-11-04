@@ -9,6 +9,8 @@ window.PQ_CONFIG = {
   // Supabase (publishable key; table is insert-only, reads need the scout PIN via RPC)
   SUPABASE_URL: "https://yzzfyuihbvltwurvfbam.supabase.co",
   SUPABASE_KEY: "sb_publishable_f_SMBMBU0DNSs7abpO2h2g_oMxCM4Jy",
+  // Web3Forms backup email (public access key by design)
+  WEB3FORMS_KEY: "86d162ce-7a6b-4a84-864b-6459405096e3",
   SKIP_AFTER_SEC: 150,   // "Skip level" appears after this long on a level...
   SKIP_AFTER_FAILS: 4,   // ...or after this many failed tries
   HINT_AFTER_SEC: 45,

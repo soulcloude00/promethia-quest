@@ -1881,11 +1881,18 @@ async function submitRecord(rec) {
     Name: rec.name, 'Grade/Section': `${rec.grade}${rec.section ? ' ' + rec.section : ''}`, 'Time taken': `${Math.floor(rec.totalSec / 60)} min ${rec.totalSec % 60} s`,
     'Overall performance': `${rec.scores.total}/100`, Title: rec.title, 'Good at': goodAt(rec.scores), Shortlisted: shortlisted(rec),
   };
-  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 15000);
-  try {
-    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body), signal: ctl.signal });
-    const j = await r.json().catch(() => ({})); if (!r.ok || j.success === 'false' || j.success === false) throw new Error(j.message || ('HTTP ' + r.status)); return j;
-  } finally { clearTimeout(to); }
+  const post = async (u, b, ms) => {
+    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), ms);
+    try {
+      const r = await fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(b), signal: ctl.signal });
+      const j = await r.json().catch(() => ({})); if (!r.ok || j.success === 'false' || j.success === false) throw new Error(j.message || ('HTTP ' + r.status)); return j;
+    } finally { clearTimeout(to); }
+  };
+  try { return await post(url, body, 8000); } catch (e) {
+    if (!CFG.WEB3FORMS_KEY) throw e; console.warn('FormSubmit failed, using Web3Forms', e.message);
+    const { _subject, _template, _captcha, ...fields } = body;
+    return await post('https://api.web3forms.com/submit', { access_key: CFG.WEB3FORMS_KEY, subject: _subject, from_name: 'Promethia Quest', ...fields }, 15000);
+  }
 }
 async function retryUnsent() {
   if (TEST) return; const a = getArchive(); let changed = false;
