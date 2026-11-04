@@ -1893,6 +1893,33 @@ async function retryUnsent() {
   if (changed) setArchive(a);
 }
 window.PQ_submitRecord = submitRecord;
+/* Supabase: instant save, with a localStorage queue for unsent rows */
+const SB_QUEUE = 'pq_sbqueue';
+function sbRow(rec) {
+  return { name: rec.name, grade_section: `${rec.grade}${rec.section ? ' ' + rec.section : ''}`, score: rec.scores && rec.scores.total, title: rec.title,
+    time_taken: `${Math.floor(rec.totalSec / 60)} min ${rec.totalSec % 60} s`, details: { ...rec, goodAt: rec.scores ? goodAt(rec.scores) : '' } };
+}
+async function sbInsert(row) {
+  if (!CFG.SUPABASE_URL || !CFG.SUPABASE_KEY) throw new Error('no supabase');
+  const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 12000);
+  try {
+    const r = await fetch(`${CFG.SUPABASE_URL}/rest/v1/quest_results`, { method: 'POST', headers: { apikey: CFG.SUPABASE_KEY, Authorization: `Bearer ${CFG.SUPABASE_KEY}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' }, body: JSON.stringify(row), signal: ctl.signal });
+    if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text().catch(() => '')));
+  } finally { clearTimeout(to); }
+}
+function sbQ() { try { return JSON.parse(localStorage.getItem(SB_QUEUE) || '[]'); } catch (e) { return []; } }
+function sbSetQ(q) { try { localStorage.setItem(SB_QUEUE, JSON.stringify(q)); } catch (e) { } }
+async function sbSave(rec) {
+  if (rec.test) return false; const row = sbRow(rec);
+  for (let i = 0; i < 3; i++) { try { await sbInsert(row); return true; } catch (e) { console.warn('supabase failed', e.message); if (i < 2) await sleep(1200 * (i + 1)); } }
+  const q = sbQ(); if (!q.some(x => x.details && x.details.id === rec.id)) { q.push(row); sbSetQ(q); } return false;
+}
+async function sbFlush() {
+  const q = sbQ(); if (!q.length) return; const left = [];
+  for (const row of q) { try { await sbInsert(row); } catch (e) { left.push(row); } }
+  sbSetQ(left);
+}
+setTimeout(() => sbFlush().catch(() => { }), 2000);
 
 /* ================= FINISH ================= */
 // Grand finale: fly to a giant torch on the last island, ignite it, light up every island
@@ -1944,14 +1971,16 @@ async function finishGame() {
   $('#resIslands').innerHTML = LEVELS.map((d, i) => `<div class="isl1" title="${d.name}"><span>${d.emoji}</span><small>${i + 1}</small><b>${'★'.repeat(rec.islandStars[i])}<em>${'★'.repeat(3 - rec.islandStars[i])}</em></b></div>`).join('');
   show('#results'); Sound.sfx('win');
   $('#saveStatus').className = 'save'; $('#saveStatus').textContent = 'Saving… ⏳';
+  const sbP = sbSave(rec).catch(() => false);
   let ok = false; { const a1 = getArchive(); const m1 = a1.find(r => r.id === rec.id); if (m1) { m1.tryAt = Date.now(); setArchive(a1); } }
   for (let i = 0; i < 2 && !ok; i++) { try { await submitRecord(rec); ok = true; } catch (e) { console.warn('submit failed', e.message); await sleep(1500); } }
   const a2 = getArchive(); const me = a2.find(r => r.id === rec.id); if (me) { me.sent = ok; if (ok) me.sentAt = new Date().toISOString(); setArchive(a2); }
+  const sbOk = await sbP; ok = ok || sbOk;
   $('#saveStatus').className = 'save ok'; $('#saveStatus').textContent = ok ? 'Saved ✓' : 'Saved on this PC ✓ (email will retry later)';
   window.__pqDone = { ok, id: rec.id }; show('#btnNext');
 }
 $('#btnNext').onclick = () => {
-  Object.keys(localStorage).forEach(k => { if (k !== ARCHIVE_KEY && k !== QUALITY_KEY && k !== SOUND_KEY) localStorage.removeItem(k); });
+  Object.keys(localStorage).forEach(k => { if (k !== ARCHIVE_KEY && k !== SB_QUEUE && k !== QUALITY_KEY && k !== SOUND_KEY) localStorage.removeItem(k); });
   try { sessionStorage.clear(); } catch (e) { }
   location.replace(location.pathname + location.search);
 };

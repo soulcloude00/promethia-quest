@@ -22,7 +22,7 @@ details{background:#fff;padding:10px;border-radius:8px;margin-top:12px}
 #print{display:none}
 @media print{header,#gate,#app{display:none!important}#print{display:block!important;font-size:12px}#print table{font-size:11px}#print th{background:#1a2a4f!important;color:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}#print h1{font-size:20px}}
 </style></head><body>
-<header><img src="assets/logo-mark-96.png" alt=""><div><b>Promethia</b> Quest · Scout dashboard <small>(attempts saved on this PC)</small></div></header>
+<header><img src="assets/logo-mark-96.png" alt=""><div><b>Promethia</b> Quest · Scout dashboard <small>(attempts saved on this PC) · <a href="results.html" style="color:#ffd23f">Live results (all PCs) →</a></small></div></header>
 <div id="gate"><h2>Enter PIN</h2><input id="pin" type="password"  autocomplete="off"><br><br><button id="go">Open</button><p id="err" style="color:#b3202f"></p></div>
 <main id="app" hidden>
   <div class="bar">
@@ -44,7 +44,7 @@ details{background:#fff;padding:10px;border-radius:8px;margin-top:12px}
   <details><summary><b>How scoring works</b></summary><p>Total /100 = Problem-solving 35 + Persistence 20 + Curiosity 15 + Creativity 20 + Communication 10. Children are ranked only against others in the same grade band (5-6 or 7-8), because each band plays its own track. Badges: each child gets their top 5 out of 20. Time is recorded but not scored.</p></details></section>
 </main>
 <div id="print"></div>
-<script src="config.js?v=pin2"></script>
+<script src="config.js?v=v7"></script>
 <script>
 const K='pq_archive';const $=s=>document.querySelector(s);
 async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}

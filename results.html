@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Promethia Quest · Live results</title><meta name="robots" content="noindex"><link rel="icon" href="assets/favicon-32.png">
+<style>
+*{box-sizing:border-box}body{font-family:system-ui,sans-serif;margin:0;background:#f6f3ef;color:#1a2a4f;font-size:15px}
+header{background:#1a2a4f;color:#fff;padding:12px 18px;display:flex;align-items:center;gap:10px}header img{width:34px;border-radius:8px}header b{color:#f26b21}
+main{padding:16px;max-width:1200px;margin:auto}button{font:inherit;background:#f26b21;color:#fff;border:0;border-radius:8px;padding:10px 14px;font-weight:700;cursor:pointer;min-height:42px}
+#gate{max-width:320px;margin:80px auto;text-align:center}#gate input{font-size:22px;padding:10px;width:100%;text-align:center;border-radius:8px;border:2px solid #1a2a4f33}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;padding:10px;border-radius:10px;border:1px solid #ddd}.bar input{padding:8px;border:1px solid #ccc;border-radius:8px;font:inherit}
+.tw{overflow:auto;max-height:75vh;margin-top:10px;background:#fff;border-radius:10px;border:1px solid #ddd}
+table{border-collapse:collapse;width:100%;font-size:14px}th,td{border-bottom:1px solid #eee;padding:8px;text-align:left;white-space:nowrap}th{background:#1a2a4f;color:#fff;position:sticky;top:0;cursor:pointer;user-select:none}
+tr.new td{background:#fff3e8}#st{font-size:13px;color:#555}
+</style></head><body>
+<header><img src="assets/logo-mark-96.png" alt=""><div><b>Promethia</b> Quest · Live results <small>(all PCs, from the cloud)</small></div></header>
+<div id="gate"><h2>Enter PIN</h2><input id="pin" type="password" autocomplete="off"><br><br><button id="go">Open</button><p id="err" style="color:#b3202f"></p></div>
+<main id="app" hidden>
+  <div class="bar"><b id="count">0 results</b><input id="q" placeholder="Search name / grade"><span style="flex:1"></span><span id="st"></span><button id="csv">⬇ Download CSV</button></div>
+  <div class="tw"><table id="t"></table></div>
+  <p id="st2" style="font-size:12px;color:#777">Auto-refreshes every 10 seconds. Click a column to sort.</p>
+</main>
+<script src="config.js?v=v7"></script>
+<script>
+const $=s=>document.querySelector(s),C=window.PQ_CONFIG||{};
+let PIN=null,rows=[],sortK='created_at',sortD=-1,seen=new Set(),first=true,timer=null;
+const COLS=[['name','Name'],['grade_section','Grade'],['score','Score'],['title','Title'],['time_taken','Time'],['created_at','When (IST)']];
+async function sha(s){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}
+const ist=t=>t?new Date(t).toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'})+' IST':'';
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('#go').onclick=async()=>{const p=$('#pin').value.trim();if(await sha(p)===C.SCOUT_PIN_SHA256){PIN=p;$('#pin').value='';$('#gate').hidden=true;$('#app').hidden=false;load();timer=setInterval(load,10000)}else $('#err').textContent='Wrong PIN'};
+$('#pin').onkeydown=e=>{if(e.key==='Enter')$('#go').click()};
+async function load(){
+  try{
+    const r=await fetch(C.SUPABASE_URL+'/rest/v1/rpc/get_quest_results',{method:'POST',headers:{apikey:C.SUPABASE_KEY,Authorization:'Bearer '+C.SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({pin:PIN})});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const d=await r.json();const fresh=new Set();d.forEach(x=>{if(!first&&!seen.has(x.id))fresh.add(x.id);seen.add(x.id)});first=false;rows=d.map(x=>({...x,_new:fresh.has(x.id)}));
+    $('#st').textContent='Updated '+ist(new Date());render();
+  }catch(e){$('#st').textContent='⚠ Could not load ('+e.message+') – retrying';}
+}
+function view(){const q=$('#q').value.trim().toLowerCase();return rows.filter(r=>!q||(r.name+' '+r.grade_section).toLowerCase().includes(q)).sort((a,b)=>{let x=a[sortK],y=b[sortK];if(sortK==='score'){x=+x||0;y=+y||0}else{x=String(x??'').toLowerCase();y=String(y??'').toLowerCase()}return (x>y?1:x<y?-1:0)*sortD})}
+function render(){const v=view();$('#count').textContent=v.length+' result'+(v.length===1?'':'s');
+  $('#t').innerHTML='<thead><tr><th>#</th>'+COLS.map(([k,n])=>`<th data-k="${k}">${n}${k===sortK?(sortD>0?' ▲':' ▼'):''}</th>`).join('')+'</tr></thead><tbody>'+v.map((r,i)=>`<tr class="${r._new?'new':''}"><td>${i+1}</td><td>${esc(r.name)}</td><td>${esc(r.grade_section)}</td><td><b>${esc(r.score)}</b></td><td>${esc(r.title)}</td><td>${esc(r.time_taken)}</td><td>${ist(r.created_at)}</td></tr>`).join('')+'</tbody>';
+  document.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(k===sortK)sortD=-sortD;else{sortK=k;sortD=k==='name'||k==='grade_section'||k==='title'?1:-1}render()})}
+$('#q').oninput=render;
+$('#csv').onclick=()=>{const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const csv=[COLS.map(c=>c[1]).concat('Details JSON').join(',')].concat(view().map(r=>[r.name,r.grade_section,r.score,r.title,r.time_taken,ist(r.created_at),JSON.stringify(r.details||{})].map(q).join(','))).join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv'}));a.download='promethia-quest-results-'+new Date().toISOString().slice(0,10)+'.csv';a.click()};
+</script>
+</body></html>
